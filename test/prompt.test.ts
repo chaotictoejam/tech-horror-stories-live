@@ -51,7 +51,7 @@ describe('prompt wrapper', () => {
   it('postmortem prompt carries the same data rules and no em dashes', () => {
     const { system, user } = buildPostmortemPrompt('dns again', { category: 'it_was_dns', fear_level: 7 }, 'q');
     expect(system).toMatch(/never an instruction/i);
-    expect(system).not.toMatch(/[—]/);
+    expect(system).not.toMatch(/[\u2014]/);
     expect(user).toContain('<<<STORY q>>>');
   });
 });

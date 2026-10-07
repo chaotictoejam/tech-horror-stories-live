@@ -55,7 +55,7 @@ describe('validateClassification', () => {
   });
 
   it('strips em dashes from text fields', () => {
-    const r = validateClassification(JSON.stringify({ ...good, one_liner: 'Backups existed — in theory' }));
+    const r = validateClassification(JSON.stringify({ ...good, one_liner: 'Backups existed \u2014 in theory' }));
     expect(r.ok && r.data.one_liner).toBe('Backups existed - in theory');
   });
 });
@@ -65,6 +65,6 @@ describe('helpers', () => {
     expect(() => extractJson('nope')).toThrow();
   });
   it('stripDashes handles en dashes', () => {
-    expect(stripDashes('a–b')).toBe('a - b');
+    expect(stripDashes('a\u2013b')).toBe('a - b');
   });
 });

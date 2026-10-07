@@ -36,7 +36,7 @@ export type Classification = z.infer<typeof ClassificationSchema>;
 
 /** Replace em and en dashes so nothing on the board renders one. */
 export function stripDashes(s: string): string {
-  return s.replace(/\s*[—–]\s*/g, ' - ');
+  return s.replace(/\s*[\u2014\u2013]\s*/g, ' - ');
 }
 
 /** Pull the first JSON object out of a model response that may include fences or prose. */

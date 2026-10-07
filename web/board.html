@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0f14">
+  <title>Horror Board</title>
+  <link rel="stylesheet" href="board.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Tech Horror Stories</h1>
+      <span id="replay-badge" class="replay" hidden>REPLAY</span>
+    </div>
+    <nav role="tablist" aria-label="Board views">
+      <button role="tab" id="tab-feed" aria-selected="true" data-tab="feed">Feed</button>
+      <button role="tab" id="tab-leaders" aria-selected="false" data-tab="leaders">Leaderboard</button>
+      <button role="tab" id="tab-graveyard" aria-selected="false" data-tab="graveyard">Graveyard <span id="grave-count" class="pill">0</span></button>
+    </nav>
+    <div id="presenter" class="presenter" hidden>
+      <label for="pm-id" class="sr-only">Story id for postmortem</label>
+      <input id="pm-id" placeholder="scariest story" autocomplete="off" spellcheck="false">
+      <button id="pm-go" class="primary">Postmortem</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-feed" role="tabpanel" aria-labelledby="tab-feed">
+      <ol id="feed" class="cards"></ol>
+      <p id="feed-empty" class="empty">Waiting for the first horror story...</p>
+    </section>
+
+    <section id="view-leaders" role="tabpanel" aria-labelledby="tab-leaders" hidden>
+      <div class="leaders">
+        <div>
+          <h2>Scariest so far</h2>
+          <ol id="podium" class="podium"></ol>
+        </div>
+        <div>
+          <h2>By category</h2>
+          <div id="chart" class="chart" role="table" aria-label="Stories per category"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-graveyard" role="tabpanel" aria-labelledby="tab-graveyard" hidden>
+      <ol id="graveyard" class="graves"></ol>
+      <p id="grave-empty" class="empty">Nothing buried yet.</p>
+    </section>
+  </main>
+
+  <footer id="counter" aria-live="off">
+    <div class="stat"><span class="k">Stories</span><span class="v" id="c-stories">0</span></div>
+    <div class="stat"><span class="k">Input tokens</span><span class="v" id="c-in">0</span></div>
+    <div class="stat"><span class="k">Output tokens</span><span class="v" id="c-out">0</span></div>
+    <div class="stat"><span class="k">Model cost</span><span class="v accent" id="c-cost">$0.0000</span></div>
+    <div class="stat running"><span class="dot" id="c-dot"></span><span id="c-running">Currently running: nothing</span></div>
+  </footer>
+
+  <div id="pm-panel" class="overlay" hidden>
+    <article role="dialog" aria-modal="true" aria-labelledby="pm-title">
+      <button id="pm-close" class="close" aria-label="Close postmortem">Close</button>
+      <p class="kicker">Blameless postmortem</p>
+      <h2 id="pm-title"></h2>
+      <div id="pm-body" class="pm-body"></div>
+      <p id="pm-meta" class="pm-meta"></p>
+    </article>
+  </div>
+
+  <script src="board.js"></script>
+</body>
+</html>
