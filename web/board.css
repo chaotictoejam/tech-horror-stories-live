@@ -66,6 +66,7 @@ h2 { font-size: 22px; text-transform: uppercase; letter-spacing: 0.1em; color: v
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 20px 22px;
+  align-content: start;
 }
 .card.selectable { cursor: pointer; }
 .card.selected { border-color: var(--accent); }
@@ -136,20 +137,20 @@ footer {
 /* ---------- Postmortem overlay ---------- */
 .overlay {
   position: fixed; inset: 0; background: rgba(5, 8, 11, 0.86); display: flex; align-items: flex-start; justify-content: center;
-  padding: 40px 32px calc(var(--counter-h) + 24px); overflow-y: auto; z-index: 10;
+  padding: 24px 32px calc(var(--counter-h) + 16px); overflow-y: auto; z-index: 10;
 }
 .overlay[hidden] { display: none; }
 .overlay article {
   position: relative; width: min(1180px, 100%); background: var(--panel); border: 1px solid var(--line); border-top: 6px solid var(--accent);
-  border-radius: 18px; padding: 36px 48px;
+  border-radius: 18px; padding: 28px 44px;
 }
 .kicker { margin: 0; color: var(--accent); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; font-size: 18px; }
-#pm-title { font-size: 40px; color: var(--ink); text-transform: none; letter-spacing: -0.01em; margin: 6px 0 22px; font-weight: 800; line-height: 1.15; }
-.pm-body { font-size: 26px; line-height: 1.45; columns: 2 460px; column-gap: 48px; }
+#pm-title { font-size: 36px; color: var(--ink); text-transform: none; letter-spacing: -0.01em; margin: 4px 0 16px; font-weight: 800; line-height: 1.15; }
+.pm-body { font-size: 23px; line-height: 1.38; columns: 2 460px; column-gap: 48px; }
 .pm-body h3 { break-after: avoid; color: var(--accent); font-size: 22px; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 6px; }
-.pm-body p, .pm-body ul { margin: 0 0 18px; break-inside: avoid; }
+.pm-body p, .pm-body ul { margin: 0 0 14px; break-inside: avoid; }
 .pm-body ul { padding-left: 1.1em; }
-.pm-body li { margin-bottom: 4px; }
+.pm-body li { margin-bottom: 2px; }
 .pm-body .waiting { color: var(--muted); }
 .pm-meta { color: var(--muted); font-size: 16px; margin: 12px 0 0; }
 .close { position: absolute; top: 18px; right: 20px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 14px; cursor: pointer; font-size: 16px; }

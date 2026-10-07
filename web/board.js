@@ -67,8 +67,8 @@
   }
   tabs.forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
   try {
-    const saved = localStorage.getItem('ths-tab');
-    if (saved && $('view-' + saved)) showTab(saved);
+    const wanted = new URLSearchParams(location.search).get('tab') || localStorage.getItem('ths-tab');
+    if (wanted && $('view-' + wanted)) showTab(wanted);
   } catch { /* ignore */ }
 
   // ---------- Rendering ----------
@@ -158,7 +158,7 @@
       seenGraves.add(g.id);
       li.append(el('span', 'reason', REASON_LABELS[g.reason] || 'Pipeline error'));
       if (g.reason === 'moderation_blocked') {
-        li.append(el('span', 'text redacted', 'Blocked by moderation'));
+        li.append(el('span', 'text redacted', 'Story redacted'));
       } else if (g.text) {
         li.append(el('span', 'text', g.text));
       } else {
