@@ -99,7 +99,7 @@ export class PipelineStack extends Stack {
       description: 'Reads a raw story from S3 and checks it is usable',
       alarmTopic: alertTopic,
     });
-    rawBucket.grantRead(loadStory.fn, 'stories/*');
+    loadStory.fn.addToRolePolicy(new iam.PolicyStatement({ actions: ['s3:GetObject'], resources: [rawBucket.arnForObjects('stories/*')] }));
 
     const moderate = new MonitoredFunction(this, 'Moderate', {
       handler: 'moderate',
