@@ -1,6 +1,8 @@
 # Tech Horror Stories
 
-A live conference demo. Audience members scan a QR code, submit a short tech horror story from their phone, and watch it flow through a serverless AWS pipeline onto a live board on the projector. The point: you don't need a data platform to build an AI-powered pipeline.
+This is for a live conference demo. Audience members scan a QR code, submit a short tech horror story from their phone, and watch it flow through a serverless AWS pipeline onto a live board on the projector. 
+
+What's the point: you don't need a data platform to build an AI-powered pipeline.
 
 ```mermaid
 flowchart LR
