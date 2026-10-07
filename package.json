@@ -1,0 +1,51 @@
+{
+  "name": "tech-horror-stories-live",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc",
+    "synth": "cdk synth --quiet",
+    "seed": "tsx scripts/seed.ts",
+    "qr": "tsx scripts/qr.ts",
+    "kill": "tsx scripts/kill.ts",
+    "reopen": "tsx scripts/reopen.ts",
+    "replay": "tsx scripts/replay.ts",
+    "presenter-key": "tsx scripts/presenter-key.ts",
+    "deploy": "cdk deploy --all --outputs-file cdk-outputs.json",
+    "teardown": "bash scripts/teardown.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chaotictoejam/tech-horror-stories-live.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chaotictoejam/tech-horror-stories-live/issues"
+  },
+  "homepage": "https://github.com/chaotictoejam/tech-horror-stories-live#readme",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1147.0",
+    "@aws-sdk/client-dynamodb": "^3.1147.0",
+    "@aws-sdk/client-lambda": "^3.1147.0",
+    "@aws-sdk/client-s3": "^3.1147.0",
+    "@aws-sdk/client-sfn": "^3.1147.0",
+    "@aws-sdk/client-ssm": "^3.1147.0",
+    "@aws-sdk/lib-dynamodb": "^3.1147.0",
+    "aws-cdk-lib": "^2.272.0",
+    "constructs": "^10.8.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.164",
+    "@types/node": "^26.6.4",
+    "@types/qrcode": "^1.5.6",
+    "aws-cdk": "^2.1144.0",
+    "aws-sdk-client-mock": "^4.1.0",
+    "esbuild": "^0.28.2",
+    "qrcode": "^1.5.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  },
+  "private": true,
+  "type": "module"
+}
