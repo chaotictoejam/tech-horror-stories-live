@@ -1,10 +1,19 @@
 {
   "app": "npx tsx bin/app.ts",
-  "watch": { "include": ["bin", "lib", "config", "src", "web"] },
+  "watch": {
+    "include": [
+      "bin",
+      "lib",
+      "config",
+      "src",
+      "web"
+    ]
+  },
   "context": {
     "classifierModelId": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
     "postmortemModelId": "us.anthropic.claude-sonnet-5-5",
     "alertEmail": "",
-    "budgetUsd": 5
+    "budgetUsd": 5,
+    "@aws-cdk/core:defaultCrossStackReferences": "strong"
   }
 }

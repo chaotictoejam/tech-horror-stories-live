@@ -20,6 +20,8 @@ export interface MonitoredFunctionProps {
   memorySize?: number;
   /** Optional SNS topic notified when the error alarm fires. */
   alarmTopic?: sns.ITopic;
+  /** Errors per 5 minutes that trip the alarm. Default 1. */
+  errorThreshold?: number;
 }
 
 /**
@@ -52,6 +54,7 @@ export class MonitoredFunction extends Construct {
         format: nodejs.OutputFormat.ESM,
         target: 'node22',
         minify: true,
+        logLevel: nodejs.LogLevel.ERROR,
         sourceMap: true,
         // Bundle the AWS SDK so we control the version (ApplyGuardrail, Converse).
         externalModules: [],
@@ -62,7 +65,7 @@ export class MonitoredFunction extends Construct {
     this.errorAlarm = new cloudwatch.Alarm(this, 'ErrorAlarm', {
       alarmDescription: `Errors in ${props.handler}`,
       metric: this.fn.metricErrors({ period: Duration.minutes(5), statistic: 'Sum' }),
-      threshold: 1,
+      threshold: props.errorThreshold ?? 1,
       evaluationPeriods: 1,
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
