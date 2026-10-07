@@ -33,7 +33,7 @@ Every Lambda uses one construct, `MonitoredFunction` ([lib/constructs/monitored-
 ## The state machine
 
 ```
-Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Classify and Validate -> Publish to Board -> Published
+Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Apply Redactions -> Classify and Validate -> Publish to Board -> Published
                     |                                |                    (Parallel: Classify -> Validate Output,
                     |                                |                     Retry x2 on InvalidModelOutput)
                     v                                v                          |
@@ -44,6 +44,7 @@ Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Classify and
 - One execution per story (no Map state). Each one can be opened in the console during the talk.
 - Every failure path ends in `Rejected`, a Succeed state. Bad input never fails an execution.
 - `Classify and Validate` is a Parallel with one branch. That lets a single native Retry re-run both steps when the model returns something that fails the zod schema.
+- `Apply Redactions` swaps in the Guardrail's masked text, so names become `[name]` before the model, the table, or the board see them.
 - Text that never passed moderation is blanked before it reaches the Graveyard. The board also hides moderated text in the API response.
 
 ## Prerequisites
@@ -131,7 +132,8 @@ The whole talk should come in well under $1. Tear down afterwards so the alarms 
 - **Profanity:** allowed through the pipeline (the Guardrail has no profanity filter), stored as written, and censored on the way out by the board and postmortem APIs (`fucking` shows as `f******`). The word list is in [src/shared/censor.ts](src/shared/censor.ts).
 - **Output:** the board renders every string with `textContent`. CloudFront adds a strict Content-Security-Policy (no inline scripts or styles).
 - **IAM:** every grant is scoped to a specific resource. Bedrock `InvokeModel` is scoped to the configured inference profile and the regions it routes to.
-- **Privacy:** the Guardrail blocks emails, phone numbers, addresses, card numbers, passwords, and AWS keys. Story text is logged only at DEBUG (off). Raw S3 objects expire after one day. Step Functions keeps execution input and output (including story text) until the state machine is deleted by teardown.
+- **No naming and shaming:** the Guardrail anonymizes personal names, usernames, and `@handles` instead of blocking the story. "Dave from ops dropped prod" is published as "[name] from ops dropped prod". The masked text is what gets classified, stored, and shown, and the classifier and postmortem prompts both say never to name a person.
+- **Privacy:** the Guardrail blocks emails, phone numbers, addresses, card numbers, passwords, and AWS keys. Story text is logged only at DEBUG (off). Raw S3 objects expire after one day. Step Functions keeps execution input and output until the state machine is deleted by teardown. The `Load Story` output there still has the original text, names included; every later state has the masked text.
 
 ## Demo run sheet
 
@@ -191,7 +193,7 @@ Press `P` (or click **Postmortem**) to write one for the scariest story. To pick
 ## Design decisions and assumptions
 
 - The EventBridge rule lives in `TechHorrorPipeline`, not `TechHorrorIngestion`. The rule targets the state machine and the pipeline reads the bucket, so putting it in ingestion would create a circular cross-stack reference.
-- Moderation uses a Bedrock Guardrail (`ApplyGuardrail`), not a model call. It is cheaper and shows up as its own cost line. The PII filter does not block personal names, so "Dave dropped prod" gets through. Emails, phone numbers, and keys are blocked.
+- Moderation uses a Bedrock Guardrail (`ApplyGuardrail`), not a model call. It is cheaper and shows up as its own cost line. Names are masked rather than blocked so a story about "Dave" still makes the board without naming him. Emails, phone numbers, and keys block the whole story.
 - Empty stories are accepted by the submit API on purpose, so the Graveyard has something to show. Stories over 280 characters are rejected with 400 at the API. The pipeline checks length again.
 - No batch/CSV path. Seed goes through the real API, one execution per story.
 - Postmortems run asynchronously (start, then poll) because HTTP APIs time out after 30 seconds and larger models can think for a while.

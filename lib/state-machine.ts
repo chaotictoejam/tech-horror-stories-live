@@ -177,9 +177,21 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
   publish.addRetry({ errors: ['DynamoDB.ProvisionedThroughputExceededException', 'DynamoDB.InternalServerErrorException'], maxAttempts: 3 });
   publish.addCatch(pipelineError, { errors: ['States.ALL'], resultPath: '$.error' });
 
+  // From here on the story carries the Guardrail's masked text, so names never reach the model,
+  // the table, or the board.
+  const applyRedactions = new sfn.Pass(scope, 'Apply Redactions', {
+    parameters: {
+      'storyId.$': '$.story.storyId',
+      'createdAt.$': '$.story.createdAt',
+      'usable.$': '$.story.usable',
+      'text.$': '$.moderation.text',
+    },
+    resultPath: '$.story',
+  });
+
   const passedModeration = new sfn.Choice(scope, 'Passed Moderation?')
     .when(sfn.Condition.booleanEquals('$.moderation.blocked', true), redact)
-    .otherwise(classifyAndValidate.next(publish.next(new sfn.Succeed(scope, 'Published'))));
+    .otherwise(applyRedactions.next(classifyAndValidate).next(publish).next(new sfn.Succeed(scope, 'Published')));
 
   const usable = new sfn.Choice(scope, 'Is Story Usable?')
     .when(sfn.Condition.booleanEquals('$.story.usable', true), moderate.next(passedModeration))

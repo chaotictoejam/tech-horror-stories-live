@@ -15,7 +15,7 @@ export const SEED_STORIES: SeedStory[] = [
   { kind: 'good', text: 'A cron job nobody owned ran at 3:17am every night for six years. We turned the old server off to save money. The next morning invoicing, password resets, and the office coffee machine all stopped.' },
   { kind: 'good', text: 'Ran rm -rf $BUILD_DIR/ in a cleanup script. BUILD_DIR was unset in that environment. The script ran as root. The server was very clean afterwards.' },
   { kind: 'good', text: 'Site down for 6 hours. We checked the load balancers, the database, the CDN, the code, and our life choices. It was fucking DNS. The TTL was set to one week.' },
-  { kind: 'good', text: 'We migrated to Kubernetes for resilience. The cluster certificate expired on New Year\'s Day. Nobody knew how to renew it because the consultant who set it up had changed his phone number.' },
+  { kind: 'good', text: 'We migrated to Kubernetes for resilience. The cluster certificate expired on New Year\'s Day. Nobody knew how to renew it because Brad, the consultant who set it up, had changed his phone number.' },
   { kind: 'good', text: 'A dashboard showed 99.99% uptime for a year. It was measuring whether the dashboard was up.' },
   { kind: 'good', text: 'Feature flag cleanup PR removed a flag called temp_do_not_remove. It controlled whether we charged customers. Revenue dropped to zero and nobody noticed for four days because the alert was behind a flag too.' },
   { kind: 'good', text: 'Our disaster recovery plan was a Word doc stored on the file server we were trying to recover.' },

@@ -9,6 +9,7 @@ import type * as sns from 'aws-cdk-lib/aws-sns';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import { Construct } from 'constructs';
+import { createHash } from 'node:crypto';
 import type { AppConfig } from '../config/app-config.js';
 import { invokeModelStatement } from './bedrock-iam.js';
 import { MonitoredFunction } from './constructs/monitored-function.js';
@@ -48,7 +49,7 @@ export class PipelineStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    const guardrail = new bedrock.CfnGuardrail(this, 'Guardrail', {
+    const guardrailProps: bedrock.CfnGuardrailProps = {
       name: `${this.stackName}-moderation`,
       description: 'Blocks hate, sexual content, threats, and personal data in audience stories.',
       blockedInputMessaging: 'Blocked by moderation',
@@ -84,12 +85,23 @@ export class PipelineStack extends Stack {
           'PASSWORD',
           'AWS_ACCESS_KEY',
           'AWS_SECRET_KEY',
-        ].map((type) => ({ type, action: 'BLOCK' })),
+        ]
+          .map((type) => ({ type, action: 'BLOCK' }))
+          // Names and handles are masked, not blocked: the story still runs, but nobody gets named
+          // on the projector. The Moderate step swaps in the masked text before anything stores it.
+          .concat(['NAME', 'USERNAME'].map((type) => ({ type, action: 'ANONYMIZE' }))),
+        regexesConfig: [
+          { name: 'Handle', description: 'Social or chat handles like @dave', pattern: '@[A-Za-z0-9_.-]{2,}', action: 'ANONYMIZE' },
+        ],
       },
-    });
-    const guardrailVersion = new bedrock.CfnGuardrailVersion(this, 'GuardrailVersion', {
+    };
+    const guardrail = new bedrock.CfnGuardrail(this, 'Guardrail', guardrailProps);
+    // A guardrail version is a snapshot. Key its logical id on the config so any change publishes a
+    // new version, and the pipeline never keeps running against a stale one.
+    const configHash = createHash('sha256').update(JSON.stringify(guardrailProps)).digest('hex').slice(0, 8);
+    const guardrailVersion = new bedrock.CfnGuardrailVersion(this, `GuardrailVersion${configHash}`, {
       guardrailIdentifier: guardrail.attrGuardrailId,
-      description: 'Pinned version used by the pipeline',
+      description: `Pipeline snapshot ${configHash}`,
     });
 
     const common = { TABLE_NAME: this.table.tableName };

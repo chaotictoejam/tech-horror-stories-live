@@ -36,7 +36,7 @@ export function buildClassifierPrompt(text: string, nonce?: string) {
     ' "root_cause": string, at most 8 words,',
     ' "survivable": boolean,',
     ' "one_liner": string, at most 12 words, a deadpan news headline about the incident}',
-    'Do not use em dashes. Do not add any other keys.',
+    'Never include a person\'s name or username in any field; say "an engineer" or similar. Do not use em dashes. Do not add any other keys.',
   ].join('\n');
   const user = `Classify this story.\n\n${w.block}`;
   return { system, user, nonce: w.nonce };

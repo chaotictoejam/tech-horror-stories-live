@@ -109,6 +109,7 @@ describe('state machine definition', () => {
   it('is a Standard workflow with the expected states', () => {
     expect(Object.keys(definition.States).sort()).toEqual(
       [
+        'Apply Redactions',
         'Classify and Validate',
         'Is Story Usable?',
         'Load Story',
@@ -138,7 +139,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
   it('publishes a good story with tokens and cost', async () => {
     const res = await runner().run(storyObject('The site was down for 6 hours. It was DNS. The TTL was a week.'));
     expect(res.status).toBe('SUCCEEDED');
-    expect(res.path).toEqual(['Load Story', 'Is Story Usable?', 'Moderate', 'Passed Moderation?', 'Classify and Validate', 'Classify', 'Validate Output', 'Publish to Board', 'Published']);
+    expect(res.path).toEqual(['Load Story', 'Is Story Usable?', 'Moderate', 'Passed Moderation?', 'Apply Redactions', 'Classify and Validate', 'Classify', 'Validate Output', 'Publish to Board', 'Published']);
     const item = published();
     expect(item.category.S).toBe('it_was_dns');
     expect(item.fear_level.N).toBe('7');
@@ -178,6 +179,55 @@ describe('pipeline execution (mocked Bedrock)', () => {
     expect(grave.text.S).toBe('');
     expect(JSON.stringify(res.output)).not.toContain('someone@example.com');
     expect(bedrockMock.commandCalls(ConverseCommand)).toHaveLength(0);
+  });
+
+  describe('names', () => {
+    const anonymized = (masked: string, count = 1) => ({
+      action: 'GUARDRAIL_INTERVENED' as const,
+      outputs: [{ text: masked }],
+      assessments: [
+        {
+          sensitiveInformationPolicy: {
+            piiEntities: Array.from({ length: count }, () => ({ type: 'NAME' as const, match: 'x', action: 'ANONYMIZED' as const })),
+            regexes: [],
+          },
+        },
+      ],
+      usage: { contentPolicyUnits: 1, topicPolicyUnits: 1, sensitiveInformationPolicyUnits: 1, sensitiveInformationPolicyFreeUnits: 0, wordPolicyUnits: 0, contextualGroundingPolicyUnits: 0 },
+    });
+
+    it('masks names before the model, the table, or the board see them', async () => {
+      bedrockMock.on(ApplyGuardrailCommand).resolves(anonymized('{NAME} from ops dropped the prod database at 2am.'));
+      const res = await runner().run(storyObject('Dave from ops dropped the prod database at 2am.'));
+      expect(res.path).toContain('Apply Redactions');
+      expect(res.path.at(-1)).toBe('Published');
+      expect(published().text.S).toBe('[name] from ops dropped the prod database at 2am.');
+      const prompt = bedrockMock.commandCalls(ConverseCommand)[0].args[0].input.messages![0].content![0].text!;
+      expect(prompt).toContain('[name] from ops');
+      expect(prompt).not.toContain('Dave');
+    });
+
+    it('keeps masked text when the story is later buried for bad model output', async () => {
+      bedrockMock.on(ApplyGuardrailCommand).resolves(anonymized('{NAME} ran rm -rf on the wrong box.'));
+      bedrockMock.on(ConverseCommand).resolves(converseReply('nope'));
+      await runner().run(storyObject('Priya ran rm -rf on the wrong box.'));
+      expect(graveyardReason()).toBe('invalid_model_output');
+      expect(putItems.find((i) => i.status.S === 'graveyard').text.S).toBe('[name] ran rm -rf on the wrong box.');
+    });
+
+    it('still blocks when a name is masked but another policy blocks', async () => {
+      const both = anonymized('{NAME} ...');
+      both.assessments.push({ contentPolicy: { filters: [{ type: 'HATE', confidence: 'HIGH', action: 'BLOCKED' }] } } as any);
+      bedrockMock.on(ApplyGuardrailCommand).resolves(both);
+      await runner().run(storyObject('Some hateful story naming Dave'));
+      expect(graveyardReason()).toBe('moderation_blocked');
+    });
+
+    it('fails closed on an intervention with no explanation', async () => {
+      bedrockMock.on(ApplyGuardrailCommand).resolves({ ...anonymized('x', 0), assessments: [] });
+      await runner().run(storyObject('A normal story that somehow tripped the guardrail'));
+      expect(graveyardReason()).toBe('moderation_blocked');
+    });
   });
 
   it('recovers when the first model output is invalid', async () => {
