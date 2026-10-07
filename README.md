@@ -90,7 +90,7 @@ npm run teardown         # after the talk
 
 | Script | What it does |
 |---|---|
-| `npm run seed [-- --fast]` | Submits the 20 seed stories (15 good, 2 empty or gibberish, 1 moderation trigger, 2 prompt injections) |
+| `npm run seed [-- --fast]` | Submits the 20 seed stories (15 good, two with swearing that the board censors; 2 empty or gibberish; 1 moderation trigger; 2 prompt injections) |
 | `npm run qr` | `qr/submit-slide.{png,svg}` (1600px) and `qr/submit-corner.{png,svg}` (200px) for the submit URL |
 | `npm run kill` | Submit endpoint returns 503 "Submissions closed" immediately |
 | `npm run reopen` | Opens submissions again |
@@ -128,6 +128,7 @@ The whole talk should come in well under $1. Tear down afterwards so the alarms 
 - **Rate limits:** stage throttling (20 rps, burst 40 for submit; postmortem route 1 rps, burst 2) and a 20 second per-device cooldown enforced with a DynamoDB conditional write. The device is a random id the phone keeps in localStorage. Without one it falls back to a hash of IP and user agent. Only the hash is stored.
 - **Kill switch:** one DynamoDB item, read with a consistent read on every submit.
 - **Presenter key:** postmortems cost real money, so `POST /api/postmortem` needs the key from SSM (SecureString). The board reads it from `#key=` once, keeps it in sessionStorage for that tab, and removes it from the address bar.
+- **Profanity:** allowed through the pipeline (the Guardrail has no profanity filter), stored as written, and censored on the way out by the board and postmortem APIs (`fucking` shows as `f******`). The word list is in [src/shared/censor.ts](src/shared/censor.ts).
 - **Output:** the board renders every string with `textContent`. CloudFront adds a strict Content-Security-Policy (no inline scripts or styles).
 - **IAM:** every grant is scoped to a specific resource. Bedrock `InvokeModel` is scoped to the configured inference profile and the regions it routes to.
 - **Privacy:** the Guardrail blocks emails, phone numbers, addresses, card numbers, passwords, and AWS keys. Story text is logged only at DEBUG (off). Raw S3 objects expire after one day. Step Functions keeps execution input and output (including story text) until the state machine is deleted by teardown.

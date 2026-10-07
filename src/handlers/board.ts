@@ -1,6 +1,7 @@
 import { ListExecutionsCommand, SFNClient } from '@aws-sdk/client-sfn';
 import { GetCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
+import { censor } from '../shared/censor.js';
 import { CATEGORIES } from '../shared/schema.js';
 import { queryByStatus, scariest, type StoryRow } from '../shared/board-data.js';
 import { json } from '../shared/http.js';
@@ -31,23 +32,24 @@ async function inFlight(): Promise<number> {
 const feedCard = (r: StoryRow) => ({
   id: r.id,
   createdAt: r.createdAt,
-  text: r.text ?? '',
+  text: censor(r.text ?? ''),
   category: r.category,
   fear_level: r.fear_level,
-  root_cause: r.root_cause,
+  root_cause: censor(r.root_cause),
   survivable: r.survivable,
-  one_liner: r.one_liner,
+  one_liner: censor(r.one_liner),
   input_tokens: r.input_tokens,
   output_tokens: r.output_tokens,
   cost_usd: r.cost_usd,
 });
 
 // Moderated text is never sent to the browser, even if it somehow reached the table.
+// Everything else is censored for profanity on the way out.
 const graveCard = (r: StoryRow) => ({
   id: r.id,
   createdAt: r.createdAt,
   reason: r.reason ?? 'other',
-  text: r.reason === 'moderation_blocked' ? '' : (r.text ?? ''),
+  text: r.reason === 'moderation_blocked' ? '' : censor(r.text ?? ''),
 });
 
 export const handler = async (): Promise<APIGatewayProxyStructuredResultV2> => {

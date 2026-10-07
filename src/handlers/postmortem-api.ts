@@ -2,6 +2,7 @@ import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import { queryByStatus, scariest } from '../shared/board-data.js';
+import { censor } from '../shared/censor.js';
 import { json, parseBody } from '../shared/http.js';
 import { log } from '../shared/log.js';
 import { isPresenter } from '../shared/presenter.js';
@@ -20,10 +21,10 @@ function view(item: Record<string, any>) {
   return {
     storyId: item.id,
     status: item.postmortem_status ?? 'none',
-    one_liner: item.one_liner,
+    one_liner: censor(item.one_liner),
     category: item.category,
     fear_level: item.fear_level,
-    postmortem: item.postmortem_status === 'done' ? item.postmortem : undefined,
+    postmortem: item.postmortem_status === 'done' ? censor(item.postmortem) : undefined,
   };
 }
 

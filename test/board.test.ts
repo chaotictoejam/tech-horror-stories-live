@@ -47,12 +47,12 @@ describe('board handler', () => {
   it('returns feed, totals, categories, in-flight count, and redacts moderated text', async () => {
     docMock
       .on(QueryCommand, { ExpressionAttributeValues: { ':s': 'published' } })
-      .resolves({ Items: [pub('story-0001', 4), pub('story-0002', 8, { category: 'no_backups' })] })
+      .resolves({ Items: [pub('story-0001', 4, { text: 'It was fucking DNS' }), pub('story-0002', 8, { category: 'no_backups' })] })
       .on(QueryCommand, { ExpressionAttributeValues: { ':s': 'graveyard' } })
       .resolves({
         Items: [
           { id: 'grave-0001', status: 'graveyard', createdAt: '2026-10-07T12:00:00Z', reason: 'moderation_blocked', text: 'leaked text' },
-          { id: 'grave-0002', status: 'graveyard', createdAt: '2026-10-07T12:00:00Z', reason: 'invalid_model_output', text: 'ok text' },
+          { id: 'grave-0002', status: 'graveyard', createdAt: '2026-10-07T12:00:00Z', reason: 'invalid_model_output', text: 'ok shit text' },
         ],
       });
     docMock.on(GetCommand).resolves({ Item: { id: 'TOTALS', input_tokens: 1200, output_tokens: 140, cost_usd: 0.0019, model_calls: 2 } });
@@ -66,7 +66,9 @@ describe('board handler', () => {
     expect(body.leaderboard[0].id).toBe('story-0002');
     expect(body.inFlight).toBe(1);
     expect(body.graveyard[0].text).toBe('');
-    expect(body.graveyard[1].text).toBe('ok text');
+    expect(body.graveyard[1].text).toBe('ok s*** text');
+    expect(body.feed.find((f: any) => f.id === 'story-0001').text).toBe('It was f****** DNS');
+    expect(res.body).not.toMatch(/fuck|shit/);
     expect(res.body).not.toContain('leaked text');
   });
 });

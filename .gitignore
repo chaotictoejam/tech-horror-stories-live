@@ -6,3 +6,4 @@ qr/
 replay/recording.json
 *.log
 .env
+.presenter-url
