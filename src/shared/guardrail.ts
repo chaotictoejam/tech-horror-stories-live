@@ -31,7 +31,12 @@ const PLACEHOLDERS: Record<string, string> = {
 };
 
 export function friendlyPlaceholders(text: string): string {
-  return text.replace(/\{([A-Za-z_]+)\}/g, (m, key: string) => PLACEHOLDERS[key] ?? '[redacted]');
+  return (
+    text
+      .replace(/\{([A-Za-z_]+)\}/g, (m, key: string) => PLACEHOLDERS[key] ?? '[redacted]')
+      // Two detectors can match the same span (the IP model and the IPv4 regex): keep one placeholder.
+      .replace(/(\[[a-z ]+\])(?:\1)+/g, '$1')
+  );
 }
 
 export function summarize(res: ApplyGuardrailCommandOutput) {
