@@ -7,6 +7,7 @@ export interface DeployedOutputs {
   boardUrl: string;
   configTable: string;
   storiesTable: string;
+  stateMachineArn?: string;
   stateMachineConsoleUrl?: string;
 }
 
@@ -31,6 +32,7 @@ export async function loadOutputs(): Promise<DeployedOutputs> {
     boardUrl: board.BoardUrl,
     configTable: ingestion.ConfigTableName,
     storiesTable: pipeline.StoriesTableName,
+    stateMachineArn: pipeline.StateMachineArn,
     stateMachineConsoleUrl: board.StateMachineConsoleUrl,
   };
 }

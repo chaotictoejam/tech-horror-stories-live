@@ -13,7 +13,8 @@
     "presenter-key": "tsx scripts/presenter-key.ts",
     "deploy": "cdk deploy --all --outputs-file cdk-outputs.json",
     "teardown": "bash scripts/teardown.sh",
-    "admin": "tsx scripts/admin.ts"
+    "admin": "tsx scripts/admin.ts",
+    "reset": "tsx scripts/reset.ts"
   },
   "repository": {
     "type": "git",
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@aws-sdk/client-cloudformation": "^3.1147.0",
+    "@aws-sdk/client-sqs": "^3.1147.0",
     "@types/aws-lambda": "^8.10.164",
     "@types/node": "^26.6.4",
     "@types/qrcode": "^1.5.6",

@@ -98,6 +98,7 @@ npm run teardown         # after the talk
 | `npm run seed [-- --fast]` | Submits the 21 seed stories (15 good, two with a little swearing that the board censors; 2 empty or gibberish; 1 personal data; 1 with too much swearing; 2 prompt injections) |
 | `npm run qr` | `qr/submit-slide.{png,svg}` (1600px) and `qr/submit-corner.{png,svg}` (200px) for the submit URL |
 | `npm run admin` | Local presenter page: bury or restore stories, open or close submissions |
+| `npm run reset` | Empties the board: every story, Graveyard entry, cached postmortem, and the cost counter. Asks you to type `reset`. Infrastructure, presenter key, and kill switch are untouched |
 | `npm run kill` | Submit endpoint returns 503 "Submissions closed" immediately |
 | `npm run reopen` | Opens submissions again |
 | `npm run presenter-key` | Rotates the presenter key in SSM and prints `board.html#key=...` |
@@ -187,7 +188,7 @@ It listens on 127.0.0.1 only, requires the random token from the printed URL, an
 - [ ] `npm test` passes and `npm run deploy` succeeds in the presenting account.
 - [ ] `npm run presenter-key`. Bookmark the printed URL on the presenter laptop only.
 - [ ] `npm run qr`. Put `qr/submit-slide.png` on the "join in" slide and `qr/submit-corner.png` in the corner of later slides.
-- [ ] `npm run seed`. Wait 30 seconds. The Feed has 15 stories and the Graveyard has the rest, each with a quip.
+- [ ] `npm run reset` to clear any test stories, then `npm run seed`. Wait 30 seconds. The Feed has 15 stories and the Graveyard has the rest, each with a quip.
 - [ ] Click Postmortem once to warm it up and cache it.
 - [ ] `npm run replay -- --record`, then `npm run replay` and check the offline board works.
 - [ ] Submit one story from your own phone on mobile data. It should appear within about 10 seconds.
