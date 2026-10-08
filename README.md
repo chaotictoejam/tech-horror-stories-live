@@ -58,9 +58,17 @@ Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Apply Redact
 2. CDK bootstrap in that account and region, once: `npx cdk bootstrap`.
 3. **Bedrock model access** in the deploy region. By default both models are called through US cross-region inference profiles:
    - Classifier: `us.anthropic.claude-haiku-4-5-20251001-v1:0` (Claude Haiku 4.5)
-   - Postmortem: `us.anthropic.claude-sonnet-5-5` (Claude Sonnet 5.5)
+   - Postmortem: `us.anthropic.claude-sonnet-4-6` (Claude Sonnet 4.6)
 
-   If your account has never used Anthropic models on Bedrock, submit the one-time use case form in the Bedrock console first. Confirm the exact profile IDs your account sees:
+   If your account has never used Anthropic models on Bedrock, submit the one-time use case form in the Bedrock console first.
+
+   **Check quotas, not just access.** A model can be listed as ACTIVE and still have a quota of 0. New accounts start with 0 tokens per minute for Claude 5.x models on Bedrock, which is why the postmortem defaults to Sonnet 4.6. New accounts also get only 10 concurrent Lambda executions; request 1,000 in Service Quotas (Lambda, "Concurrent executions") a few days before the talk. Haiku 4.5 allows 50 requests per minute by default; the pipeline retries patiently on throttling, so a burst arrives late rather than in the Graveyard.
+   ```bash
+   aws lambda get-account-settings --query AccountLimit.ConcurrentExecutions
+   aws service-quotas list-service-quotas --service-code bedrock --query "Quotas[?contains(QuotaName,'Cross-region model inference')&&contains(QuotaName,'Claude')].[QuotaName,Value]" --output text
+   ```
+
+   Confirm the exact profile IDs your account sees:
    ```bash
    aws bedrock list-inference-profiles --query "inferenceProfileSummaries[?contains(inferenceProfileId,'anthropic')].inferenceProfileId"
    ```
@@ -73,7 +81,7 @@ Model IDs, the alert email, and the budget come from CDK context or environment 
 | Setting | Context key | Env var | Default |
 |---|---|---|---|
 | Classifier model | `classifierModelId` | `CLASSIFIER_MODEL_ID` | Haiku 4.5 US profile |
-| Postmortem model | `postmortemModelId` | `POSTMORTEM_MODEL_ID` | Sonnet 5.5 US profile |
+| Postmortem model | `postmortemModelId` | `POSTMORTEM_MODEL_ID` | Sonnet 4.6 US profile |
 | Alarm and budget email | `alertEmail` | `ALERT_EMAIL` | none (budget still alerts the SNS topic) |
 | Monthly budget (USD) | `budgetUsd` | `BUDGET_USD` | 5 |
 
@@ -117,7 +125,7 @@ Rough model cost for 60 people x 3 stories (180 stories):
 |---|---|
 | Guardrail (story and model output, 1 text unit each) | about $0.15 |
 | Classify (about 650 input, 70 output tokens on Haiku 4.5) | about $0.18 |
-| Postmortems (5 runs on Sonnet 5.5) | about $0.15 |
+| Postmortems (5 runs on Sonnet 4.6) | about $0.10 |
 | **Total shown on the counter** | **about $0.50** |
 
 **Not included in the counter:** Step Functions transitions, Lambda, API Gateway, DynamoDB, S3, EventBridge, SQS, CloudFront, CloudWatch. Rough figures for the same session:
@@ -188,6 +196,8 @@ It listens on 127.0.0.1 only, requires the random token from the printed URL, an
 ### The day before
 
 - [ ] `npm test` passes and `npm run deploy` succeeds in the presenting account.
+- [ ] Lambda concurrent executions is 1,000, not 10 (see Prerequisites).
+- [ ] Load test: 60 stories at once with `npm run seed -- --burst 60`, then `npm run reset`.
 - [ ] `npm run presenter-key`. Bookmark the printed URL on the presenter laptop only.
 - [ ] `npm run qr`. Put `qr/submit-slide.png` on the "join in" slide and `qr/submit-corner.png` in the corner of later slides.
 - [ ] `npm run reset` to clear any test stories, then `npm run seed`. Wait 30 seconds. The Feed has 15 stories and the Graveyard has the rest, each with a quip.

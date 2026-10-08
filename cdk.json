@@ -11,7 +11,7 @@
   },
   "context": {
     "classifierModelId": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-    "postmortemModelId": "us.anthropic.claude-sonnet-5-5",
+    "postmortemModelId": "us.anthropic.claude-sonnet-4-6",
     "alertEmail": "",
     "budgetUsd": 5,
     "@aws-cdk/core:defaultCrossStackReferences": "strong"

@@ -31,6 +31,18 @@ const TRANSIENT_ERRORS = [
   'InternalServerException',
 ];
 
+// Patient retries: Haiku 4.5 allows 50 requests per minute and a new account allows 10 concurrent
+// Lambdas, so a room-wide burst gets throttled. Waiting up to about a minute (3, 6, 12, 20, 20, 20
+// seconds, with jitter so retries spread out) means a story arrives late instead of being buried.
+const PATIENT_RETRY: sfn.RetryProps = {
+  errors: TRANSIENT_ERRORS,
+  maxAttempts: 6,
+  interval: Duration.seconds(3),
+  backoffRate: 2,
+  maxDelay: Duration.seconds(20),
+  jitterStrategy: sfn.JitterType.FULL,
+};
+
 const S = (path: string) => tasks.DynamoAttributeValue.fromString(sfn.JsonPath.stringAt(path));
 // DynamoDB wants numbers as strings, so serialize with States.JsonToString.
 const N = (path: string) => tasks.DynamoAttributeValue.numberFromString(sfn.JsonPath.jsonToString(sfn.JsonPath.objectAt(path)));
@@ -117,7 +129,7 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
     resultPath: '$.story',
     retryOnServiceExceptions: false,
   });
-  loadStory.addRetry({ errors: TRANSIENT_ERRORS, maxAttempts: 3, interval: Duration.seconds(1), backoffRate: 2 });
+  loadStory.addRetry(PATIENT_RETRY);
   loadStory.addCatch(unreadable, { errors: ['States.ALL'], resultPath: '$.error' });
 
   const moderate = new tasks.LambdaInvoke(scope, 'Moderate', {
@@ -130,7 +142,7 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
     resultPath: '$.moderation',
     retryOnServiceExceptions: false,
   });
-  moderate.addRetry({ errors: TRANSIENT_ERRORS, maxAttempts: 3, interval: Duration.seconds(1), backoffRate: 2 });
+  moderate.addRetry(PATIENT_RETRY);
   moderate.addCatch(moderationDown, { errors: ['States.ALL'], resultPath: '$.error' });
 
   const classify = new tasks.LambdaInvoke(scope, 'Classify', {
@@ -142,13 +154,14 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
     }),
     retryOnServiceExceptions: false,
   });
-  classify.addRetry({ errors: TRANSIENT_ERRORS, maxAttempts: 3, interval: Duration.seconds(2), backoffRate: 2 });
+  classify.addRetry(PATIENT_RETRY);
 
   const validate = new tasks.LambdaInvoke(scope, 'Validate Output', {
     lambdaFunction: fns.validate,
     payloadResponseOnly: true,
     retryOnServiceExceptions: false,
   });
+  validate.addRetry(PATIENT_RETRY);
 
   // Parallel with one branch: lets a single Retry re-run Classify and Validate together.
   const classifyAndValidate = new sfn.Parallel(scope, 'Classify and Validate', {
@@ -218,7 +231,7 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
     resultPath: '$.outputCheck',
     retryOnServiceExceptions: false,
   });
-  moderateOutput.addRetry({ errors: TRANSIENT_ERRORS, maxAttempts: 3, interval: Duration.seconds(1), backoffRate: 2 });
+  moderateOutput.addRetry(PATIENT_RETRY);
   moderateOutput.addCatch(pipelineError, { errors: ['States.ALL'], resultPath: '$.error' });
 
   const outputPassed = new sfn.Choice(scope, 'Output Passed?')

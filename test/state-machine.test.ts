@@ -138,6 +138,13 @@ describe('state machine definition', () => {
     );
   });
 
+  it('waits patiently on throttling instead of burying the story', () => {
+    const classify = definition.States['Classify and Validate'].Branches[0].States.Classify;
+    expect(classify.Retry[0]).toMatchObject({ MaxAttempts: 6, IntervalSeconds: 3, MaxDelaySeconds: 20, JitterStrategy: 'FULL' });
+    expect(classify.Retry[0].ErrorEquals).toEqual(expect.arrayContaining(['ThrottlingException', 'Lambda.TooManyRequestsException']));
+    for (const name of ['Load Story', 'Moderate', 'Moderate Output']) expect(definition.States[name].Retry[0].MaxAttempts).toBe(6);
+  });
+
   it('retries classify and validate together up to 2 times on InvalidModelOutput', () => {
     expect(definition.States['Classify and Validate'].Retry).toEqual([
       expect.objectContaining({ ErrorEquals: ['InvalidModelOutput'], MaxAttempts: 2 }),

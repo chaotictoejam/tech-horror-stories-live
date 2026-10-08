@@ -55,26 +55,41 @@
     refresh();
     say('');
     try {
-      const res = await fetch('/api/stories', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: story.value.slice(0, MAX), deviceId: deviceId() }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (res.status === 202) {
+      const payload = JSON.stringify({ text: story.value.slice(0, MAX), deviceId: deviceId() });
+      // Retry quietly on server hiccups (a room-wide burst can briefly throttle the backend).
+      let res;
+      let body = {};
+      for (let attempt = 0; attempt < 4; attempt++) {
+        if (attempt > 0) {
+          say('Busy room. Retrying...', '');
+          await new Promise((r) => setTimeout(r, 1500 * attempt + Math.random() * 1000));
+        }
+        try {
+          res = await fetch('/api/stories', { method: 'POST', headers: { 'content-type': 'application/json' }, body: payload });
+          body = await res.json().catch(() => ({}));
+        } catch {
+          res = undefined;
+          continue;
+        }
+        const killSwitch = res.status === 503 && body.message === 'Submissions closed';
+        if (res.status < 500 || killSwitch) break;
+      }
+      if (!res) {
+        say('Could not reach the server. Try again in a moment.', 'err');
+      } else if (res.status === 202) {
         story.value = '';
         say('Received. Watch the board.', 'ok');
         startCooldown(COOLDOWN);
       } else if (res.status === 429) {
         say(body.message || 'Slow down a little.', 'err');
         startCooldown(Number(res.headers.get('retry-after')) || COOLDOWN);
-      } else if (res.status === 503) {
+      } else if (res.status === 503 && body.message === 'Submissions closed') {
         say('Submissions are closed. Thanks for playing.', 'err');
+      } else if (res.status >= 500) {
+        say('The server is swamped. Try again in a few seconds.', 'err');
       } else {
         say(body.message || `Something went wrong (${res.status}).`, 'err');
       }
-    } catch {
-      say('Could not reach the server. Try again in a moment.', 'err');
     } finally {
       busy = false;
       refresh();
