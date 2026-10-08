@@ -26,11 +26,17 @@ export interface LoadedStory {
 
 const KEY_PATTERN = /^stories\/([A-Za-z0-9-]{8,64})\.json$/;
 
-/** True when text has fewer than 3 word-like tokens (letters with at least one vowel). */
+/**
+ * True when text does not read like words. A token counts as a word if it has a vowel (and no
+ * 4+ repeated letters), or is a short all-caps acronym like DNS, AWS, SQL, or K8S, so "It was DNS."
+ * passes. Gibberish means fewer than 2 words, or fewer than half the tokens are words.
+ */
 export function isGibberish(text: string): boolean {
-  const words = text.toLowerCase().match(/[a-z][a-z']+/g) ?? [];
-  const real = words.filter((w) => /[aeiouy]/.test(w) && !/(.)\1{3,}/.test(w));
-  return real.length < 3;
+  const tokens = text.match(/[A-Za-z0-9][A-Za-z0-9']+/g)?.filter((t) => /[A-Za-z]/.test(t)) ?? [];
+  const real = tokens.filter(
+    (t) => (/[aeiouy]/i.test(t) && !/(.)\1{3,}/i.test(t)) || /^[A-Z][A-Z0-9]{1,4}$/.test(t),
+  );
+  return real.length < 2 || real.length / tokens.length < 0.5;
 }
 
 export function assess(text: unknown): { usable: boolean; reason?: GraveyardReason; detail?: string } {
