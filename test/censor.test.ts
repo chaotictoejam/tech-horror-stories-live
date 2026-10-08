@@ -26,3 +26,23 @@ describe('censor', () => {
     expect(censor('')).toBe('');
   });
 });
+
+describe('censor evasion', () => {
+  it.each([
+    ['sh1t happens', 's*** happens'],
+    ['what the f*ck', 'what the f***'],
+    ['f u c k this', 'f*** this'],
+    ['s.h.i.t', 's***'],
+    ['@sshole', '@******'],
+    ['b1tch', 'b****'],
+  ])('masks %s', (input, expected) => {
+    expect(censor(input)).toBe(expected);
+  });
+
+  it.each(['passes', 'assess', 'A B testing', 'Shitake', 'r u ok', 'class', 'Dickens', 'Scunthorpe', 'title', 'cocktail', 'assignment'])(
+    'leaves %s alone',
+    (word) => {
+      expect(censor(word)).toBe(word);
+    },
+  );
+});

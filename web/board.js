@@ -21,6 +21,7 @@
     invalid_model_output: 'Model output rejected',
     too_long: 'Too long',
     other: 'Pipeline error',
+    removed: 'Removed by presenter',
   };
 
   // ---------- Presenter key: passed once as board.html#key=..., kept for this tab only ----------
@@ -157,7 +158,7 @@
       if (!seenGraves.has(g.id) && !firstRender) li.classList.add('new');
       seenGraves.add(g.id);
       li.append(el('span', 'reason', REASON_LABELS[g.reason] || 'Pipeline error'));
-      if (g.reason === 'moderation_blocked') {
+      if (g.reason === 'moderation_blocked' || g.reason === 'removed') {
         li.append(el('span', 'text redacted', 'Story redacted'));
       } else if (g.text) {
         li.append(el('span', 'text', g.text));
@@ -242,6 +243,9 @@
     if (data.status === 'done' && data.postmortem) {
       renderMarkdown(data.postmortem, body);
       $('pm-meta').textContent = `${label(data.category)} · fear ${data.fear_level}/10 · story ${data.storyId}`;
+    } else if (data.status === 'blocked') {
+      body.replaceChildren(el('p', 'waiting', 'The postmortem failed its own moderation review. Try another story.'));
+      $('pm-meta').textContent = '';
     } else if (data.status === 'error') {
       body.replaceChildren(el('p', 'waiting', 'The postmortem writer had its own incident. Try again.'));
     } else {

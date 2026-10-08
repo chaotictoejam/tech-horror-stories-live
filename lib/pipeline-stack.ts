@@ -1,4 +1,4 @@
-import { Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
+import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
 import * as bedrock from 'aws-cdk-lib/aws-bedrock';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as events from 'aws-cdk-lib/aws-events';
@@ -25,6 +25,7 @@ export class PipelineStack extends Stack {
   readonly table: dynamodb.Table;
   readonly stateMachine: sfn.StateMachine;
   readonly graveyardQueue: sqs.Queue;
+  readonly guardrail: { id: string; version: string; arn: string };
 
   constructor(scope: Construct, id: string, props: PipelineStackProps) {
     super(scope, id, props);
@@ -73,6 +74,36 @@ export class PipelineStack extends Stack {
             definition: 'Statements threatening violence, harm, doxxing, or retaliation against a real person or group.',
             examples: ['I know where my manager lives and he will pay', 'Someone should hurt the person who wrote this code'],
           },
+          {
+            // Name masking cannot catch people identified by description.
+            name: 'IdentifiablePerson',
+            type: 'DENY',
+            definition: 'Mocking, shaming, or harassing a specific real person who can be identified by their role, employer, appearance, or seat in the room, even without a name.',
+            examples: [
+              'Our CTO at Acme Corp cannot even read a stack trace',
+              'The guy in the red hoodie in row 3 broke prod and lied about it',
+              'Shoutout to the speaker, worst engineer I ever worked with',
+            ],
+          },
+          {
+            name: 'CompanyAccusation',
+            type: 'DENY',
+            definition: 'Claims that a specific named real company or employer was negligent, insecure, dishonest, or broke the law.',
+            examples: [
+              'Acme Bank stores every customer password in plaintext',
+              'Initech leaked all its customer data and covered it up',
+              'Do not trust Globex, their security team is a joke',
+            ],
+          },
+          {
+            // Output only: an audience member may joke about burnout, the model may not.
+            name: 'SelfHarmJokes',
+            type: 'DENY',
+            definition: 'Jokes, humor, or flippant remarks about suicide, self-harm, or wanting to die.',
+            examples: ['The on-call engineer considered jumping out the window', 'Action item: update the will. Owner: on-call.'],
+            inputEnabled: false,
+            outputEnabled: true,
+          },
         ],
       },
       sensitiveInformationPolicyConfig: {
@@ -87,11 +118,26 @@ export class PipelineStack extends Stack {
           'AWS_SECRET_KEY',
         ]
           .map((type) => ({ type, action: 'BLOCK' }))
-          // Names and handles are masked, not blocked: the story still runs, but nobody gets named
-          // on the projector. The Moderate step swaps in the masked text before anything stores it.
-          .concat(['NAME', 'USERNAME'].map((type) => ({ type, action: 'ANONYMIZE' }))),
+          // Names, handles, IPs, and links are masked, not blocked: the story still runs, but nobody
+          // gets named on the projector. Apply Redactions swaps in the masked text before anything stores it.
+          .concat(['NAME', 'USERNAME', 'IP_ADDRESS', 'URL'].map((type) => ({ type, action: 'ANONYMIZE' }))),
         regexesConfig: [
           { name: 'Handle', description: 'Social or chat handles like @dave', pattern: '@[A-Za-z0-9_.-]{2,}', action: 'ANONYMIZE' },
+          { name: 'AwsAccountId', description: '12 digit AWS account ids', pattern: '\\b[0-9]{12}\\b', action: 'ANONYMIZE' },
+          {
+            name: 'ApiToken',
+            description: 'GitHub, Slack, and OpenAI style tokens',
+            pattern: '(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{20,})',
+            action: 'ANONYMIZE',
+          },
+          { name: 'Jwt', description: 'JSON web tokens', pattern: 'eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}', action: 'ANONYMIZE' },
+          { name: 'PrivateKey', description: 'PEM private key headers', pattern: '-----BEGIN [A-Z ]*PRIVATE KEY-----', action: 'ANONYMIZE' },
+          {
+            name: 'InternalHost',
+            description: 'Internal hostnames',
+            pattern: '[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.(?:internal|corp|local|lan|intranet)\\b',
+            action: 'ANONYMIZE',
+          },
         ],
       },
     };
@@ -104,7 +150,9 @@ export class PipelineStack extends Stack {
       description: `Pipeline snapshot ${configHash}`,
     });
 
+    this.guardrail = { id: guardrail.attrGuardrailId, version: guardrailVersion.attrVersion, arn: guardrail.attrGuardrailArn };
     const common = { TABLE_NAME: this.table.tableName };
+    const guardrailEnv = { GUARDRAIL_ID: guardrail.attrGuardrailId, GUARDRAIL_VERSION: guardrailVersion.attrVersion };
 
     const loadStory = new MonitoredFunction(this, 'LoadStory', {
       handler: 'load-story',
@@ -116,7 +164,7 @@ export class PipelineStack extends Stack {
     const moderate = new MonitoredFunction(this, 'Moderate', {
       handler: 'moderate',
       description: 'Runs the story through a Bedrock Guardrail',
-      environment: { ...common, GUARDRAIL_ID: guardrail.attrGuardrailId, GUARDRAIL_VERSION: guardrailVersion.attrVersion },
+      environment: { ...common, ...guardrailEnv },
       timeout: Duration.seconds(20),
       alarmTopic: alertTopic,
     });
@@ -144,13 +192,25 @@ export class PipelineStack extends Stack {
       errorThreshold: 5,
     });
 
+    const moderateOutput = new MonitoredFunction(this, 'ModerateOutput', {
+      handler: 'moderate-output',
+      description: 'Runs the model headline and root cause through the Guardrail',
+      environment: { ...common, ...guardrailEnv },
+      timeout: Duration.seconds(20),
+      alarmTopic: alertTopic,
+    });
+    moderateOutput.fn.addToRolePolicy(
+      new iam.PolicyStatement({ actions: ['bedrock:ApplyGuardrail'], resources: [guardrail.attrGuardrailArn] }),
+    );
+    this.table.grant(moderateOutput.fn, 'dynamodb:UpdateItem');
+
     this.stateMachine = new sfn.StateMachine(this, 'StoryPipeline', {
       stateMachineName: `${this.stackName}-story-pipeline`,
       stateMachineType: sfn.StateMachineType.STANDARD,
       comment: 'Tech Horror Stories: load, moderate, classify, validate, publish or bury',
       definitionBody: sfn.DefinitionBody.fromChainable(
         buildPipelineDefinition(new Construct(this, 'States'), {
-          fns: { loadStory: loadStory.fn, moderate: moderate.fn, classify: classify.fn, validate: validate.fn },
+          fns: { loadStory: loadStory.fn, moderate: moderate.fn, classify: classify.fn, validate: validate.fn, moderateOutput: moderateOutput.fn },
           table: this.table,
           graveyardQueue: this.graveyardQueue,
         }),
@@ -177,5 +237,8 @@ export class PipelineStack extends Stack {
         }),
       ],
     });
+
+    new CfnOutput(this, 'StoriesTableName', { value: this.table.tableName });
+    new CfnOutput(this, 'StateMachineArn', { value: this.stateMachine.stateMachineArn });
   }
 }

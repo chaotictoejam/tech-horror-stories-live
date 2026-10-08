@@ -86,6 +86,7 @@ beforeAll(async () => {
     ModerateFn: (await import('../src/handlers/moderate.js')).handler,
     ClassifyFn: (await import('../src/handlers/classify.js')).handler,
     ValidateFn: (await import('../src/handlers/validate.js')).handler,
+    ModerateOutputFn: (await import('../src/handlers/moderate-output.js')).handler,
   };
 });
 
@@ -114,11 +115,14 @@ describe('state machine definition', () => {
         'Is Story Usable?',
         'Load Story',
         'Moderate',
+        'Moderate Output',
+        'Output Passed?',
         'Passed Moderation?',
         'Publish to Board',
         'Published',
         'Reason: Invalid Model Output',
         'Reason: Moderation Unavailable',
+        'Reason: Output Blocked',
         'Reason: Pipeline Error',
         'Reason: Unreadable Story',
         'Redact Blocked Story',
@@ -139,7 +143,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
   it('publishes a good story with tokens and cost', async () => {
     const res = await runner().run(storyObject('The site was down for 6 hours. It was DNS. The TTL was a week.'));
     expect(res.status).toBe('SUCCEEDED');
-    expect(res.path).toEqual(['Load Story', 'Is Story Usable?', 'Moderate', 'Passed Moderation?', 'Apply Redactions', 'Classify and Validate', 'Classify', 'Validate Output', 'Publish to Board', 'Published']);
+    expect(res.path).toEqual(['Load Story', 'Is Story Usable?', 'Moderate', 'Passed Moderation?', 'Apply Redactions', 'Classify and Validate', 'Classify', 'Validate Output', 'Moderate Output', 'Output Passed?', 'Publish to Board', 'Published']);
     const item = published();
     expect(item.category.S).toBe('it_was_dns');
     expect(item.fear_level.N).toBe('7');
@@ -148,8 +152,8 @@ describe('pipeline execution (mocked Bedrock)', () => {
     expect(item.output_tokens.N).toBe('71');
     expect(Number(item.cost_usd.N)).toBeCloseTo((612 * 1 + 71 * 5) / 1e6, 6);
     expect(Number(item.moderation_cost_usd.N)).toBeCloseTo(0.0004, 6);
-    // Guardrail call + classify call both recorded in the running totals.
-    expect(docMock.commandCalls(UpdateCommand)).toHaveLength(2);
+    // Input guardrail, classify, and output guardrail are all recorded in the running totals.
+    expect(docMock.commandCalls(UpdateCommand)).toHaveLength(3);
   });
 
   it.each([
@@ -197,7 +201,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
     });
 
     it('masks names before the model, the table, or the board see them', async () => {
-      bedrockMock.on(ApplyGuardrailCommand).resolves(anonymized('{NAME} from ops dropped the prod database at 2am.'));
+      bedrockMock.on(ApplyGuardrailCommand, { source: 'INPUT' }).resolves(anonymized('{NAME} from ops dropped the prod database at 2am.'));
       const res = await runner().run(storyObject('Dave from ops dropped the prod database at 2am.'));
       expect(res.path).toContain('Apply Redactions');
       expect(res.path.at(-1)).toBe('Published');
@@ -208,7 +212,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
     });
 
     it('keeps masked text when the story is later buried for bad model output', async () => {
-      bedrockMock.on(ApplyGuardrailCommand).resolves(anonymized('{NAME} ran rm -rf on the wrong box.'));
+      bedrockMock.on(ApplyGuardrailCommand, { source: 'INPUT' }).resolves(anonymized('{NAME} ran rm -rf on the wrong box.'));
       bedrockMock.on(ConverseCommand).resolves(converseReply('nope'));
       await runner().run(storyObject('Priya ran rm -rf on the wrong box.'));
       expect(graveyardReason()).toBe('invalid_model_output');
@@ -227,6 +231,48 @@ describe('pipeline execution (mocked Bedrock)', () => {
       bedrockMock.on(ApplyGuardrailCommand).resolves({ ...anonymized('x', 0), assessments: [] });
       await runner().run(storyObject('A normal story that somehow tripped the guardrail'));
       expect(graveyardReason()).toBe('moderation_blocked');
+    });
+  });
+
+  describe('model output moderation', () => {
+    const guard = (over: Record<string, unknown>) => ({
+      outputs: [],
+      assessments: [],
+      usage: { contentPolicyUnits: 1, topicPolicyUnits: 1, sensitiveInformationPolicyUnits: 1, sensitiveInformationPolicyFreeUnits: 0, wordPolicyUnits: 0, contextualGroundingPolicyUnits: 0 },
+      ...over,
+    });
+
+    it('buries a story when the model wrote something the Guardrail blocks', async () => {
+      bedrockMock.on(ApplyGuardrailCommand, { source: 'OUTPUT' }).resolves(
+        guard({
+          action: 'GUARDRAIL_INTERVENED',
+          outputs: [{ text: 'Blocked by moderation' }],
+          assessments: [{ topicPolicy: { topics: [{ name: 'SelfHarmJokes', type: 'DENY', action: 'BLOCKED' }] } }],
+        }) as any,
+      );
+      const res = await runner().run(storyObject('The pager went off 40 times in one night and I was done with everything.'));
+      expect(res.path).toContain('Reason: Output Blocked');
+      expect(graveyardReason()).toBe('invalid_model_output');
+      expect(published()).toBeUndefined();
+    });
+
+    it('publishes the masked headline when the model names someone', async () => {
+      bedrockMock.on(ApplyGuardrailCommand, { source: 'OUTPUT' }).resolves(
+        guard({
+          action: 'GUARDRAIL_INTERVENED',
+          outputs: [{ text: '{NAME} discovers DNS, regrets it\n\nOne week TTL on a record' }],
+          assessments: [{ sensitiveInformationPolicy: { piiEntities: [{ type: 'NAME', match: 'x', action: 'ANONYMIZED' }], regexes: [] } }],
+        }) as any,
+      );
+      await runner().run(storyObject('The site was down for 6 hours. It was DNS again.'));
+      expect(published().one_liner.S).toBe('[name] discovers DNS, regrets it');
+      expect(published().root_cause.S).toBe('One week TTL on a record');
+    });
+
+    it('normalizes evasion tricks before moderation sees the text', async () => {
+      await runner().run(storyObject('pro\u200bduction went d o w n because \u0440rod was test'));
+      const sent = bedrockMock.commandCalls(ApplyGuardrailCommand)[0].args[0].input.content![0].text!.text;
+      expect(sent).toBe('production went down because prod was test');
     });
   });
 

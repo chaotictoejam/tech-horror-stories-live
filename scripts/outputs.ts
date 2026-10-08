@@ -6,6 +6,7 @@ export interface DeployedOutputs {
   submitUrl: string;
   boardUrl: string;
   configTable: string;
+  storiesTable: string;
   stateMachineConsoleUrl?: string;
 }
 
@@ -16,18 +17,20 @@ export async function loadOutputs(): Promise<DeployedOutputs> {
     all = JSON.parse(readFileSync('cdk-outputs.json', 'utf8'));
   } else {
     const cfn = new CloudFormationClient({});
-    for (const name of ['Ingestion', 'Board']) {
+    for (const name of ['Ingestion', 'Pipeline', 'Board']) {
       const res = await cfn.send(new DescribeStacksCommand({ StackName: `${PREFIX}${name}` }));
       all[`${PREFIX}${name}`] = Object.fromEntries((res.Stacks?.[0]?.Outputs ?? []).map((o) => [o.OutputKey!, o.OutputValue!]));
     }
   }
   const board = all[`${PREFIX}Board`] ?? {};
   const ingestion = all[`${PREFIX}Ingestion`] ?? {};
+  const pipeline = all[`${PREFIX}Pipeline`] ?? {};
   if (!board.SubmitUrl) throw new Error('No deployed outputs found. Run npm run deploy first.');
   return {
     submitUrl: board.SubmitUrl,
     boardUrl: board.BoardUrl,
     configTable: ingestion.ConfigTableName,
+    storiesTable: pipeline.StoriesTableName,
     stateMachineConsoleUrl: board.StateMachineConsoleUrl,
   };
 }

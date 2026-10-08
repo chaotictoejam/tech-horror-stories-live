@@ -13,7 +13,7 @@ export const CATEGORIES = [
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 
-export const GRAVEYARD_REASONS = ['empty', 'moderation_blocked', 'invalid_model_output', 'too_long', 'other'] as const;
+export const GRAVEYARD_REASONS = ['empty', 'moderation_blocked', 'invalid_model_output', 'too_long', 'other', 'removed'] as const;
 export type GraveyardReason = (typeof GRAVEYARD_REASONS)[number];
 
 const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;

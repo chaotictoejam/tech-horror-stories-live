@@ -33,18 +33,22 @@ Every Lambda uses one construct, `MonitoredFunction` ([lib/constructs/monitored-
 ## The state machine
 
 ```
-Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Apply Redactions -> Classify and Validate -> Publish to Board -> Published
-                    |                                |                    (Parallel: Classify -> Validate Output,
-                    |                                |                     Retry x2 on InvalidModelOutput)
-                    v                                v                          |
-             Send to Graveyard  <-  Redact Blocked Story          Reason: Invalid Model Output / Pipeline Error
+Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Apply Redactions -> Classify and Validate
+                    |                                |                                  (Parallel: Classify -> Validate Output,
+                    |                                |                                   Retry x2 on InvalidModelOutput)
+                    |                                v                                          |
+                    |                       Redact Blocked Story                                v
+                    v                                |                       Moderate Output -> Output Passed? -> Publish to Board -> Published
+             Send to Graveyard  <--------------------+---------------------- Reason: Output Blocked / Invalid Model Output / Pipeline Error
              (Queue for Review + Record in Graveyard) -> Rejected
 ```
 
 - One execution per story (no Map state). Each one can be opened in the console during the talk.
 - Every failure path ends in `Rejected`, a Succeed state. Bad input never fails an execution.
 - `Classify and Validate` is a Parallel with one branch. That lets a single native Retry re-run both steps when the model returns something that fails the zod schema.
-- `Apply Redactions` swaps in the Guardrail's masked text, so names become `[name]` before the model, the table, or the board see them.
+- `Load Story` normalizes text first (look-alike characters, invisible and direction-flipping characters, spaced-out letters) so filter-evasion tricks stop working.
+- `Apply Redactions` swaps in the Guardrail's masked text, so names, links, and secrets become `[name]`, `[link]`, `[token]` before the model, the table, or the board see them.
+- `Moderate Output` runs the model's headline and root cause back through the same Guardrail before publishing.
 - Text that never passed moderation is blanked before it reaches the Graveyard. The board also hides moderated text in the API response.
 
 ## Prerequisites
@@ -93,6 +97,7 @@ npm run teardown         # after the talk
 |---|---|
 | `npm run seed [-- --fast]` | Submits the 20 seed stories (15 good, two with swearing that the board censors; 2 empty or gibberish; 1 moderation trigger; 2 prompt injections) |
 | `npm run qr` | `qr/submit-slide.{png,svg}` (1600px) and `qr/submit-corner.{png,svg}` (200px) for the submit URL |
+| `npm run admin` | Local presenter page: bury or restore stories, open or close submissions |
 | `npm run kill` | Submit endpoint returns 503 "Submissions closed" immediately |
 | `npm run reopen` | Opens submissions again |
 | `npm run presenter-key` | Rotates the presenter key in SSM and prints `board.html#key=...` |
@@ -108,10 +113,10 @@ Rough model cost for 60 people x 3 stories (180 stories):
 
 | Item | Estimate |
 |---|---|
-| Guardrail (3 policies, 1 text unit per story) | about $0.07 |
+| Guardrail (story and model output, 1 text unit each) | about $0.15 |
 | Classify (about 650 input, 70 output tokens on Haiku 4.5) | about $0.18 |
 | Postmortems (5 runs on Sonnet 5.5) | about $0.15 |
-| **Total shown on the counter** | **about $0.40** |
+| **Total shown on the counter** | **about $0.50** |
 
 **Not included in the counter:** Step Functions transitions, Lambda, API Gateway, DynamoDB, S3, EventBridge, SQS, CloudFront, CloudWatch. Rough figures for the same session:
 
@@ -119,9 +124,45 @@ Rough model cost for 60 people x 3 stories (180 stories):
 |---|---|
 | Step Functions Standard (about 10 transitions per story, 1,800 total; 4,000 per month are free) | $0 to $0.05 |
 | Lambda, API Gateway, DynamoDB, S3, EventBridge, SQS, CloudFront (board polling every 2s for an hour is about 1,800 requests) | under $0.05 combined |
-| CloudWatch alarms (8 alarms at $0.10 per month, prorated) | about $0.03 per day while deployed |
+| CloudWatch alarms (9 alarms at $0.10 per month, prorated) | about $0.03 per day while deployed |
 
 The whole talk should come in well under $1. Tear down afterwards so the alarms stop accruing. The $5 Budget alerts at 80% actual and 100% forecast.
+
+## Moderation
+
+Everything the audience writes and everything the model writes goes through one Bedrock Guardrail. Policies live in [lib/pipeline-stack.ts](lib/pipeline-stack.ts).
+
+| What | Action | Where |
+|---|---|---|
+| Hate, sexual content, violence, insults (low), misconduct (low) | Block | Story and model output |
+| Prompt attacks | Block | Story |
+| Threats against a person or group | Block | Story and model output |
+| Mocking an identifiable person by role, employer, appearance, or seat ("the guy in row 3") | Block | Story and model output |
+| Accusing a named real company of negligence, insecurity, or law breaking | Block | Story and model output |
+| Jokes about suicide or self-harm | Block | Model output only (an audience member venting is let through; the model may not joke about it) |
+| Emails, phone numbers, addresses, card numbers, passwords, AWS keys | Block | Story and model output |
+| Names, usernames, `@handles` | Mask as `[name]` | Story and model output |
+| IP addresses, URLs, 12 digit account ids, GitHub/Slack/OpenAI tokens, JWTs, private key headers, `*.internal` style hosts | Mask as `[ip]`, `[link]`, `[account id]`, `[token]`, `[key]`, `[host]` | Story and model output |
+| Profanity | Allowed, censored on display (`f******`), including `sh1t`, `f*ck`, `f u c k` | Board and postmortem APIs |
+| Postmortems | Whole text reviewed; a blocked one shows "failed its own moderation review" | Postmortem worker |
+
+Anything that still slips through: bury it from the admin page (below).
+
+**Tuning:** every filter sends some honest stories to the Graveyard. The company and identifiable-person topics are the most likely to over-block (for example "AWS had an outage"). After deploying, run `npm run seed` and check the Graveyard; loosen a topic by editing its definition and examples and redeploying `TechHorrorPipeline`. Guardrails are most accurate in English, French, and Spanish.
+
+## Presenter admin (local only)
+
+```bash
+npm run admin          # prints http://127.0.0.1:8787/?t=<token>
+```
+
+A page that runs on your laptop only, using your own AWS credentials. There is no public admin endpoint.
+
+- **Bury** any story on the board. It moves to the Graveyard as "Removed by presenter" and its text is never sent to the board again. **Restore** undoes it.
+- **Hide text** on a Graveyard entry that shows text.
+- **Close / reopen submissions** (same as `npm run kill` / `npm run reopen`).
+
+It listens on 127.0.0.1 only, requires the random token from the printed URL, and checks the Host header, so neither the conference Wi-Fi nor a web page you visit can drive it. Text is censored the same way as the board in case your screen is mirrored.
 
 ## Security and abuse controls
 
@@ -152,7 +193,7 @@ The whole talk should come in well under $1. Tear down afterwards so the alarms 
 - [ ] `npm run reopen` (in case you closed it).
 - [ ] Open the board bookmark on the projector at 1920x1080, browser fullscreen (F11). Keys: `1` Feed, `2` Leaderboard, `3` Graveyard, `P` postmortem, `Esc` close.
 - [ ] Open the Step Functions console in another tab (the `StateMachineConsoleUrl` output). Zoom the browser to 125% or more.
-- [ ] Have a terminal open in this repo with `npm run kill` typed and not run.
+- [ ] `npm run admin` and keep the admin page open on the laptop screen, not the projector. It is your bury button and kill switch.
 
 ### Trace one execution live
 
@@ -179,7 +220,9 @@ Press `P` (or click **Postmortem**) to write one for the scariest story. To pick
 | Board says "Reconnecting..." | Room Wi-Fi is down. Run `npm run replay` and switch the projector to `http://localhost:8080/board.html#key=replay`. The REPLAY badge stays visible. |
 | Everything lands in the Graveyard as "Pipeline error" | Usually Bedrock access or a wrong model ID. Check the Classify Lambda logs. Redeploy with `-c classifierModelId=...`. |
 | Good stories show "Blocked by moderation" | Guardrail too strict. Lower filter strengths in [lib/pipeline-stack.ts](lib/pipeline-stack.ts) and redeploy `TechHorrorPipeline` (about 1 minute). |
-| Someone is abusing the form | `npm run kill`. Phones get "Submissions closed". `npm run reopen` to continue. |
+| Something offensive is on the board | **Bury** it from the admin page. It disappears on the next 2 second poll. |
+| Someone is abusing the form | **Close submissions** on the admin page (or `npm run kill`). Phones get "Submissions closed". |
+| Postmortem "failed its own moderation review" | The Guardrail blocked what the model wrote. Shift+click Postmortem to regenerate, or pick another story. |
 | Postmortem button missing | The board was opened without `#key=`. Open the bookmark from `npm run presenter-key`. |
 | Postmortem says "Presenter key required" | The key was rotated. Re-run `npm run presenter-key` and use the new URL. Lambdas pick it up within a minute. |
 | Postmortem "had its own incident" | Postmortem model access or ID. Check the PostmortemWorker logs. The rest of the demo is unaffected. |

@@ -43,13 +43,14 @@ const feedCard = (r: StoryRow) => ({
   cost_usd: r.cost_usd,
 });
 
-// Moderated text is never sent to the browser, even if it somehow reached the table.
+// Text blocked by moderation or removed by the presenter is never sent to the browser.
 // Everything else is censored for profanity on the way out.
+const HIDDEN_REASONS = new Set(['moderation_blocked', 'removed']);
 const graveCard = (r: StoryRow) => ({
   id: r.id,
   createdAt: r.createdAt,
   reason: r.reason ?? 'other',
-  text: r.reason === 'moderation_blocked' ? '' : censor(r.text ?? ''),
+  text: HIDDEN_REASONS.has(r.reason ?? '') ? '' : censor(r.text ?? ''),
 });
 
 export const handler = async (): Promise<APIGatewayProxyStructuredResultV2> => {

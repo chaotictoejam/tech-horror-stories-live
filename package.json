@@ -12,7 +12,8 @@
     "replay": "tsx scripts/replay.ts",
     "presenter-key": "tsx scripts/presenter-key.ts",
     "deploy": "cdk deploy --all --outputs-file cdk-outputs.json",
-    "teardown": "bash scripts/teardown.sh"
+    "teardown": "bash scripts/teardown.sh",
+    "admin": "tsx scripts/admin.ts"
   },
   "repository": {
     "type": "git",

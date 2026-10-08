@@ -24,12 +24,13 @@ export interface BoardStackProps extends StackProps {
   stateMachine: sfn.IStateMachine;
   submitApi: apigw.IHttpApi;
   alertTopic: sns.ITopic;
+  guardrail: { id: string; arn: string };
 }
 
 export class BoardStack extends Stack {
   constructor(scope: Construct, id: string, props: BoardStackProps) {
     super(scope, id, props);
-    const { config, table, stateMachine, submitApi, alertTopic } = props;
+    const { config, table, stateMachine, submitApi, alertTopic, guardrail } = props;
 
     // ---------- Read API and postmortem ----------
     const board = new MonitoredFunction(this, 'Board', {
@@ -45,13 +46,21 @@ export class BoardStack extends Stack {
     const worker = new MonitoredFunction(this, 'PostmortemWorker', {
       handler: 'postmortem-worker',
       description: 'Writes a blameless postmortem with the larger Bedrock model',
-      environment: { TABLE_NAME: table.tableName, POSTMORTEM_MODEL_ID: config.postmortemModelId },
+      environment: {
+        TABLE_NAME: table.tableName,
+        POSTMORTEM_MODEL_ID: config.postmortemModelId,
+        GUARDRAIL_ID: guardrail.id,
+        // DRAFT always matches the deployed guardrail config. Importing the pinned version from the
+        // pipeline stack would create an export that blocks the next guardrail change.
+        GUARDRAIL_VERSION: 'DRAFT',
+      },
       timeout: Duration.minutes(2),
       memorySize: 512,
       alarmTopic: alertTopic,
     });
     worker.fn.configureAsyncInvoke({ retryAttempts: 0 });
     worker.fn.addToRolePolicy(invokeModelStatement(this, config.postmortemModelId));
+    worker.fn.addToRolePolicy(new iam.PolicyStatement({ actions: ['bedrock:ApplyGuardrail'], resources: [guardrail.arn] }));
     table.grant(worker.fn, 'dynamodb:GetItem', 'dynamodb:UpdateItem');
 
     const presenterParamArn = this.formatArn({ service: 'ssm', resource: 'parameter', resourceName: PRESENTER_KEY_PARAM.slice(1) });

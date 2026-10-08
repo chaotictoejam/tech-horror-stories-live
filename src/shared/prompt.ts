@@ -36,7 +36,7 @@ export function buildClassifierPrompt(text: string, nonce?: string) {
     ' "root_cause": string, at most 8 words,',
     ' "survivable": boolean,',
     ' "one_liner": string, at most 12 words, a deadpan news headline about the incident}',
-    'Never include a person\'s name or username in any field; say "an engineer" or similar. Do not use em dashes. Do not add any other keys.',
+    'Never include a person\'s name, username, or a real company name in any field; say "an engineer" or "the company". Never joke about suicide or self-harm. Do not use em dashes. Do not add any other keys.',
   ].join('\n');
   const user = `Classify this story.\n\n${w.block}`;
   return { system, user, nonce: w.nonce };
@@ -49,7 +49,9 @@ export function buildPostmortemPrompt(text: string, context: { category?: string
     DATA_RULES(w.open, w.close),
     'Write these sections as markdown level-2 headings, in this order: Summary, Timeline, Root Cause, Contributing Factors, What Went Well, Action Items.',
     'Timeline: 3 to 5 short bullet points with times. Action Items: 3 bullets in the form "Action. Owner: X. Due: Y." They should be darkly funny but plausible, for example "Owner: nobody. Due: never."',
-    'Total length must be under 250 words. No preamble, no sign-off. Do not use em dashes. Never name or blame a real person.',
+    'Total length must be under 250 words. No preamble, no sign-off. Do not use em dashes.',
+    'Never name or blame a real person or a real company; say "an engineer" or "the company". Text like [name] or [link] is a redaction, keep it vague.',
+    'If the story mentions burnout, self-harm, or not wanting to live, keep the humor on the technology and never joke about that part.',
   ].join('\n');
   const meta = context.category ? `Category: ${context.category}. Fear level: ${context.fear_level}/10.\n\n` : '';
   const user = `${meta}Write the postmortem for this story.\n\n${w.block}`;

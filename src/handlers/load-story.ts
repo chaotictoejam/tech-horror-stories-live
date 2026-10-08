@@ -2,6 +2,7 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { STORY_MAX_CHARS } from '../../config/app-config.js';
 import type { GraveyardReason } from '../shared/schema.js';
 import { log } from '../shared/log.js';
+import { normalizeStory } from '../shared/normalize.js';
 
 const s3 = new S3Client({});
 
@@ -55,6 +56,8 @@ export const handler = async (input: LoadStoryInput): Promise<LoadedStory> => {
   }
 
   const createdAt = typeof doc.createdAt === 'string' ? doc.createdAt : new Date().toISOString();
+  // Undo filter-evasion tricks before any check runs.
+  if (typeof doc.text === 'string') doc.text = normalizeStory(doc.text);
   const verdict = assess(doc.text);
   log.info('story loaded', { storyId, usable: verdict.usable, reason: verdict.reason, length: typeof doc.text === 'string' ? doc.text.length : 0 });
   return { storyId, createdAt, text: verdict.usable ? (doc.text as string).trim() : '', ...verdict };

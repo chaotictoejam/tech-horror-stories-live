@@ -22,6 +22,7 @@ new BoardStack(app, `${PREFIX}Board`, {
   stateMachine: pipeline.stateMachine,
   submitApi: ingestion.api,
   alertTopic: ingestion.alertTopic,
+  guardrail: { id: pipeline.guardrail.id, arn: pipeline.guardrail.arn },
 });
 
 Tags.of(app).add('project', 'tech-horror-stories');

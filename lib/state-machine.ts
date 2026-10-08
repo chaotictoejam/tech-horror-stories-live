@@ -11,6 +11,7 @@ export interface PipelineFunctions {
   moderate: lambda.IFunction;
   classify: lambda.IFunction;
   validate: lambda.IFunction;
+  moderateOutput: lambda.IFunction;
 }
 
 export interface PipelineDefinitionProps {
@@ -94,6 +95,7 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
   const redact = reasonState(scope, 'Redact Blocked Story', 'moderation_blocked', { keepText: false }).next(graveyard);
   const invalidOutput = reasonState(scope, 'Reason: Invalid Model Output', 'invalid_model_output', { keepText: true }).next(graveyard);
   const pipelineError = reasonState(scope, 'Reason: Pipeline Error', 'other', { keepText: true }).next(graveyard);
+  const outputBlocked = reasonState(scope, 'Reason: Output Blocked', 'invalid_model_output', { keepText: true }).next(graveyard);
 
   const loadStory = new tasks.LambdaInvoke(scope, 'Load Story', {
     lambdaFunction: fns.loadStory,
@@ -163,9 +165,9 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
       text: S('$.story.text'),
       category: S('$.verdict.category'),
       fear_level: N('$.verdict.fear_level'),
-      root_cause: S('$.verdict.root_cause'),
+      root_cause: S('$.outputCheck.root_cause'),
       survivable: tasks.DynamoAttributeValue.booleanFromJsonPath(sfn.JsonPath.stringAt('$.verdict.survivable')),
-      one_liner: S('$.verdict.one_liner'),
+      one_liner: S('$.outputCheck.one_liner'),
       model: S('$.verdict.model'),
       input_tokens: N('$.verdict.input_tokens'),
       output_tokens: N('$.verdict.output_tokens'),
@@ -189,9 +191,28 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
     resultPath: '$.story',
   });
 
+  // The model's own words get moderated too before they go on the projector.
+  const moderateOutput = new tasks.LambdaInvoke(scope, 'Moderate Output', {
+    lambdaFunction: fns.moderateOutput,
+    payloadResponseOnly: true,
+    payload: sfn.TaskInput.fromObject({
+      storyId: sfn.JsonPath.stringAt('$.story.storyId'),
+      one_liner: sfn.JsonPath.stringAt('$.verdict.one_liner'),
+      root_cause: sfn.JsonPath.stringAt('$.verdict.root_cause'),
+    }),
+    resultPath: '$.outputCheck',
+    retryOnServiceExceptions: false,
+  });
+  moderateOutput.addRetry({ errors: TRANSIENT_ERRORS, maxAttempts: 3, interval: Duration.seconds(1), backoffRate: 2 });
+  moderateOutput.addCatch(pipelineError, { errors: ['States.ALL'], resultPath: '$.error' });
+
+  const outputPassed = new sfn.Choice(scope, 'Output Passed?')
+    .when(sfn.Condition.booleanEquals('$.outputCheck.blocked', true), outputBlocked)
+    .otherwise(publish.next(new sfn.Succeed(scope, 'Published')));
+
   const passedModeration = new sfn.Choice(scope, 'Passed Moderation?')
     .when(sfn.Condition.booleanEquals('$.moderation.blocked', true), redact)
-    .otherwise(applyRedactions.next(classifyAndValidate).next(publish).next(new sfn.Succeed(scope, 'Published')));
+    .otherwise(applyRedactions.next(classifyAndValidate).next(moderateOutput).next(outputPassed));
 
   const usable = new sfn.Choice(scope, 'Is Story Usable?')
     .when(sfn.Condition.booleanEquals('$.story.usable', true), moderate.next(passedModeration))

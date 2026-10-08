@@ -53,6 +53,7 @@ describe('board handler', () => {
         Items: [
           { id: 'grave-0001', status: 'graveyard', createdAt: '2026-10-07T12:00:00Z', reason: 'moderation_blocked', text: 'leaked text' },
           { id: 'grave-0002', status: 'graveyard', createdAt: '2026-10-07T12:00:00Z', reason: 'invalid_model_output', text: 'ok shit text' },
+          { id: 'grave-0003', status: 'graveyard', createdAt: '2026-10-07T12:00:00Z', reason: 'removed', text: 'presenter buried this' },
         ],
       });
     docMock.on(GetCommand).resolves({ Item: { id: 'TOTALS', input_tokens: 1200, output_tokens: 140, cost_usd: 0.0019, model_calls: 2 } });
@@ -61,7 +62,7 @@ describe('board handler', () => {
     const { handler } = await import('../src/handlers/board.js');
     const res = await handler();
     const body = JSON.parse(res.body!);
-    expect(body.totals).toMatchObject({ stories: 4, published: 2, rejected: 2, input_tokens: 1200, output_tokens: 140, cost_usd: 0.0019 });
+    expect(body.totals).toMatchObject({ stories: 5, published: 2, rejected: 3, input_tokens: 1200, output_tokens: 140, cost_usd: 0.0019 });
     expect(body.categories).toMatchObject({ it_was_dns: 1, no_backups: 1, friday_deploy: 0 });
     expect(body.leaderboard[0].id).toBe('story-0002');
     expect(body.inFlight).toBe(1);
@@ -70,6 +71,7 @@ describe('board handler', () => {
     expect(body.feed.find((f: any) => f.id === 'story-0001').text).toBe('It was f****** DNS');
     expect(res.body).not.toMatch(/fuck|shit/);
     expect(res.body).not.toContain('leaked text');
+    expect(res.body).not.toContain('presenter buried this');
   });
 });
 

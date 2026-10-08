@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Horror Admin</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <header>
+    <h1>Horror Admin <span class="local">this laptop only</span></h1>
+    <div class="controls">
+      <span id="subs" class="subs">Submissions: ...</span>
+      <button id="toggle" class="btn">...</button>
+      <a id="board" class="btn ghost" target="_blank" rel="noopener">Open board</a>
+    </div>
+  </header>
+  <p id="msg" class="msg" role="status" aria-live="polite"></p>
+  <main>
+    <section>
+      <h2>On the board <span id="pub-count" class="count"></span></h2>
+      <table>
+        <thead><tr><th>Fear</th><th>Headline and story</th><th>Time</th><th></th></tr></thead>
+        <tbody id="published"></tbody>
+      </table>
+    </section>
+    <section>
+      <h2>Graveyard <span id="grave-count" class="count"></span></h2>
+      <table>
+        <thead><tr><th>Reason</th><th>Text (only shown if the board shows it)</th><th>Time</th><th></th></tr></thead>
+        <tbody id="graveyard"></tbody>
+      </table>
+    </section>
+  </main>
+  <script src="admin.js"></script>
+</body>
+</html>

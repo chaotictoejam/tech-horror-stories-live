@@ -1,5 +1,6 @@
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { converse } from '../shared/bedrock.js';
+import { applyGuardrail } from '../shared/guardrail.js';
 import { tokenCost } from '../shared/cost.js';
 import { log } from '../shared/log.js';
 import { buildPostmortemPrompt } from '../shared/prompt.js';
@@ -21,6 +22,22 @@ export const handler = async (input: { storyId: string }): Promise<void> => {
     await recordUsage(table, { inputTokens: out.inputTokens, outputTokens: out.outputTokens, costUsd: cost });
 
     if (!out.text) throw new Error(`empty postmortem (stop reason ${out.stopReason})`);
+
+    // The biggest block of model text on screen gets the same Guardrail as everything else.
+    const review = await applyGuardrail(out.text, 'OUTPUT');
+    if (review.blocked) {
+      log.warn('postmortem blocked by guardrail', { storyId: input.storyId, policies: review.policies });
+      await ddb.send(
+        new UpdateCommand({
+          TableName: table,
+          Key: { id: input.storyId },
+          UpdateExpression: 'SET postmortem_status = :b',
+          ExpressionAttributeValues: { ':b': 'blocked' },
+        }),
+      );
+      return;
+    }
+
     await ddb.send(
       new UpdateCommand({
         TableName: table,
@@ -28,7 +45,7 @@ export const handler = async (input: { storyId: string }): Promise<void> => {
         UpdateExpression:
           'SET postmortem = :t, postmortem_status = :d, postmortem_model = :m, postmortem_input_tokens = :i, postmortem_output_tokens = :o, postmortem_cost_usd = :c',
         ExpressionAttributeValues: {
-          ':t': stripDashes(out.text),
+          ':t': stripDashes(review.text),
           ':d': 'done',
           ':m': model,
           ':i': out.inputTokens,
