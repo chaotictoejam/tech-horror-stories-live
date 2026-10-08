@@ -15,6 +15,28 @@ import { invokeModelStatement } from './bedrock-iam.js';
 import { MonitoredFunction } from './constructs/monitored-function.js';
 import { buildPipelineDefinition } from './state-machine.js';
 
+// Spans masked rather than blocked. Shared by the main guardrail (model output) and the masking
+// guardrail (audience input), because Bedrock only anonymizes when source is OUTPUT.
+const MASK_PII = ['NAME', 'USERNAME', 'IP_ADDRESS', 'URL'];
+const MASK_REGEXES: bedrock.CfnGuardrail.RegexConfigProperty[] = [
+    { name: 'Handle', description: 'Social or chat handles like @dave', pattern: '@[A-Za-z0-9_.-]{2,}', action: 'ANONYMIZE' },
+    { name: 'AwsAccountId', description: '12 digit AWS account ids', pattern: '\\b[0-9]{12}\\b', action: 'ANONYMIZE' },
+    {
+      name: 'ApiToken',
+      description: 'GitHub, Slack, and OpenAI style tokens',
+      pattern: '(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{20,})',
+      action: 'ANONYMIZE',
+    },
+    { name: 'Jwt', description: 'JSON web tokens', pattern: 'eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}', action: 'ANONYMIZE' },
+    { name: 'PrivateKey', description: 'PEM private key headers', pattern: '-----BEGIN [A-Z ]*PRIVATE KEY-----', action: 'ANONYMIZE' },
+    {
+      name: 'InternalHost',
+      description: 'Internal hostnames',
+      pattern: '[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.(?:internal|corp|local|lan|intranet)\\b',
+      action: 'ANONYMIZE',
+    },
+];
+
 export interface PipelineStackProps extends StackProps {
   config: AppConfig;
   rawBucket: s3.IBucket;
@@ -120,39 +142,33 @@ export class PipelineStack extends Stack {
           .map((type) => ({ type, action: 'BLOCK' }))
           // Names, handles, IPs, and links are masked, not blocked: the story still runs, but nobody
           // gets named on the projector. Apply Redactions swaps in the masked text before anything stores it.
-          .concat(['NAME', 'USERNAME', 'IP_ADDRESS', 'URL'].map((type) => ({ type, action: 'ANONYMIZE' }))),
-        regexesConfig: [
-          { name: 'Handle', description: 'Social or chat handles like @dave', pattern: '@[A-Za-z0-9_.-]{2,}', action: 'ANONYMIZE' },
-          { name: 'AwsAccountId', description: '12 digit AWS account ids', pattern: '\\b[0-9]{12}\\b', action: 'ANONYMIZE' },
-          {
-            name: 'ApiToken',
-            description: 'GitHub, Slack, and OpenAI style tokens',
-            pattern: '(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{20,})',
-            action: 'ANONYMIZE',
-          },
-          { name: 'Jwt', description: 'JSON web tokens', pattern: 'eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}', action: 'ANONYMIZE' },
-          { name: 'PrivateKey', description: 'PEM private key headers', pattern: '-----BEGIN [A-Z ]*PRIVATE KEY-----', action: 'ANONYMIZE' },
-          {
-            name: 'InternalHost',
-            description: 'Internal hostnames',
-            pattern: '[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.(?:internal|corp|local|lan|intranet)\\b',
-            action: 'ANONYMIZE',
-          },
-        ],
+          .concat(MASK_PII.map((type) => ({ type, action: 'ANONYMIZE' }))),
+        regexesConfig: MASK_REGEXES,
       },
     };
     const guardrail = new bedrock.CfnGuardrail(this, 'Guardrail', guardrailProps);
-    // A guardrail version is a snapshot. Key its logical id on the config so any change publishes a
-    // new version, and the pipeline never keeps running against a stale one.
-    const configHash = createHash('sha256').update(JSON.stringify(guardrailProps)).digest('hex').slice(0, 8);
-    const guardrailVersion = new bedrock.CfnGuardrailVersion(this, `GuardrailVersion${configHash}`, {
-      guardrailIdentifier: guardrail.attrGuardrailId,
-      description: `Pipeline snapshot ${configHash}`,
-    });
+    const guardrailVersion = this.pinnedVersion('GuardrailVersion', guardrail, guardrailProps);
+
+    // Masking only: names, links, and secrets become placeholders. Applied to the audience story
+    // with source OUTPUT, since Bedrock Guardrails do not anonymize INPUT. Kept separate so the
+    // main guardrail's output-only rules (like SelfHarmJokes) never judge audience text.
+    const maskingProps: bedrock.CfnGuardrailProps = {
+      name: `${this.stackName}-masking`,
+      description: 'Masks names, handles, links, and secrets in audience stories.',
+      blockedInputMessaging: 'Blocked by moderation',
+      blockedOutputsMessaging: 'Blocked by moderation',
+      sensitiveInformationPolicyConfig: {
+        piiEntitiesConfig: MASK_PII.map((type) => ({ type, action: 'ANONYMIZE' })),
+        regexesConfig: MASK_REGEXES,
+      },
+    };
+    const maskingGuardrail = new bedrock.CfnGuardrail(this, 'MaskingGuardrail', maskingProps);
+    const maskingVersion = this.pinnedVersion('MaskingGuardrailVersion', maskingGuardrail, maskingProps);
 
     this.guardrail = { id: guardrail.attrGuardrailId, version: guardrailVersion.attrVersion, arn: guardrail.attrGuardrailArn };
     const common = { TABLE_NAME: this.table.tableName };
     const guardrailEnv = { GUARDRAIL_ID: guardrail.attrGuardrailId, GUARDRAIL_VERSION: guardrailVersion.attrVersion };
+    const maskingEnv = { MASK_GUARDRAIL_ID: maskingGuardrail.attrGuardrailId, MASK_GUARDRAIL_VERSION: maskingVersion.attrVersion };
 
     const loadStory = new MonitoredFunction(this, 'LoadStory', {
       handler: 'load-story',
@@ -164,12 +180,12 @@ export class PipelineStack extends Stack {
     const moderate = new MonitoredFunction(this, 'Moderate', {
       handler: 'moderate',
       description: 'Runs the story through a Bedrock Guardrail',
-      environment: { ...common, ...guardrailEnv },
+      environment: { ...common, ...guardrailEnv, ...maskingEnv },
       timeout: Duration.seconds(20),
       alarmTopic: alertTopic,
     });
     moderate.fn.addToRolePolicy(
-      new iam.PolicyStatement({ actions: ['bedrock:ApplyGuardrail'], resources: [guardrail.attrGuardrailArn] }),
+      new iam.PolicyStatement({ actions: ['bedrock:ApplyGuardrail'], resources: [guardrail.attrGuardrailArn, maskingGuardrail.attrGuardrailArn] }),
     );
     this.table.grant(moderate.fn, 'dynamodb:UpdateItem');
 
@@ -240,5 +256,14 @@ export class PipelineStack extends Stack {
 
     new CfnOutput(this, 'StoriesTableName', { value: this.table.tableName });
     new CfnOutput(this, 'StateMachineArn', { value: this.stateMachine.stateMachineArn });
+  }
+
+  /** A guardrail version is a snapshot. Key its logical id on the config so any change publishes a new one. */
+  private pinnedVersion(id: string, guardrail: bedrock.CfnGuardrail, props: bedrock.CfnGuardrailProps) {
+    const hash = createHash('sha256').update(JSON.stringify(props)).digest('hex').slice(0, 8);
+    return new bedrock.CfnGuardrailVersion(this, `${id}${hash}`, {
+      guardrailIdentifier: guardrail.attrGuardrailId,
+      description: `Pipeline snapshot ${hash}`,
+    });
   }
 }

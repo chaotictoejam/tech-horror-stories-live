@@ -54,13 +54,18 @@ export function summarize(res: ApplyGuardrailCommandOutput) {
 /**
  * Run text through the Guardrail, record its cost in the running totals, and decide.
  * Masking (names, links, tokens) is not a block: the masked text comes back to use instead.
+ * Bedrock only masks when source is OUTPUT; with INPUT, anonymize rules are ignored.
  * An intervention we cannot explain as masking-only fails closed and counts as a block.
  */
-export async function applyGuardrail(text: string, source: 'INPUT' | 'OUTPUT'): Promise<GuardrailVerdict> {
+export async function applyGuardrail(
+  text: string,
+  source: 'INPUT' | 'OUTPUT',
+  target = { id: process.env.GUARDRAIL_ID!, version: process.env.GUARDRAIL_VERSION! },
+): Promise<GuardrailVerdict> {
   const res = await bedrock.send(
     new ApplyGuardrailCommand({
-      guardrailIdentifier: process.env.GUARDRAIL_ID!,
-      guardrailVersion: process.env.GUARDRAIL_VERSION!,
+      guardrailIdentifier: target.id,
+      guardrailVersion: target.version,
       source,
       content: [{ text: { text } }],
       outputScope: 'INTERVENTIONS',

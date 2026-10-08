@@ -15,6 +15,8 @@ process.env.TABLE_NAME = 'stories-test';
 process.env.CLASSIFIER_MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 process.env.GUARDRAIL_ID = 'gr-test';
 process.env.GUARDRAIL_VERSION = '1';
+process.env.MASK_GUARDRAIL_ID = 'gr-mask';
+process.env.MASK_GUARDRAIL_VERSION = '1';
 process.env.AWS_REGION = 'us-east-1';
 
 const bedrockMock = mockClient(BedrockRuntimeClient);
@@ -151,9 +153,9 @@ describe('pipeline execution (mocked Bedrock)', () => {
     expect(item.input_tokens.N).toBe('612');
     expect(item.output_tokens.N).toBe('71');
     expect(Number(item.cost_usd.N)).toBeCloseTo((612 * 1 + 71 * 5) / 1e6, 6);
-    expect(Number(item.moderation_cost_usd.N)).toBeCloseTo(0.0004, 6);
-    // Input guardrail, classify, and output guardrail are all recorded in the running totals.
-    expect(docMock.commandCalls(UpdateCommand)).toHaveLength(3);
+    expect(Number(item.moderation_cost_usd.N)).toBeCloseTo(0.0008, 6);
+    // Input check, masking, classify, and output check are all recorded in the running totals.
+    expect(docMock.commandCalls(UpdateCommand)).toHaveLength(4);
   });
 
   it.each([
@@ -201,7 +203,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
     });
 
     it('masks names before the model, the table, or the board see them', async () => {
-      bedrockMock.on(ApplyGuardrailCommand, { source: 'INPUT' }).resolves(anonymized('{NAME} from ops dropped the prod database at 2am.'));
+      bedrockMock.on(ApplyGuardrailCommand, { guardrailIdentifier: 'gr-mask' }).resolves(anonymized('{NAME} from ops dropped the prod database at 2am.'));
       const res = await runner().run(storyObject('Dave from ops dropped the prod database at 2am.'));
       expect(res.path).toContain('Apply Redactions');
       expect(res.path.at(-1)).toBe('Published');
@@ -212,23 +214,31 @@ describe('pipeline execution (mocked Bedrock)', () => {
     });
 
     it('keeps masked text when the story is later buried for bad model output', async () => {
-      bedrockMock.on(ApplyGuardrailCommand, { source: 'INPUT' }).resolves(anonymized('{NAME} ran rm -rf on the wrong box.'));
+      bedrockMock.on(ApplyGuardrailCommand, { guardrailIdentifier: 'gr-mask' }).resolves(anonymized('{NAME} ran rm -rf on the wrong box.'));
       bedrockMock.on(ConverseCommand).resolves(converseReply('nope'));
       await runner().run(storyObject('Priya ran rm -rf on the wrong box.'));
       expect(graveyardReason()).toBe('invalid_model_output');
       expect(putItems.find((i) => i.status.S === 'graveyard').text.S).toBe('[name] ran rm -rf on the wrong box.');
     });
 
-    it('still blocks when a name is masked but another policy blocks', async () => {
-      const both = anonymized('{NAME} ...');
-      both.assessments.push({ contentPolicy: { filters: [{ type: 'HATE', confidence: 'HIGH', action: 'BLOCKED' }] } } as any);
-      bedrockMock.on(ApplyGuardrailCommand).resolves(both);
+    it('blocks on the input check before masking runs', async () => {
+      const hate = anonymized('Blocked by moderation', 0);
+      hate.assessments = [{ contentPolicy: { filters: [{ type: 'HATE', confidence: 'HIGH', action: 'BLOCKED' }] } } as any];
+      bedrockMock.on(ApplyGuardrailCommand, { guardrailIdentifier: 'gr-test', source: 'INPUT' }).resolves(hate);
       await runner().run(storyObject('Some hateful story naming Dave'));
       expect(graveyardReason()).toBe('moderation_blocked');
+      expect(bedrockMock.commandCalls(ApplyGuardrailCommand, { guardrailIdentifier: 'gr-mask' })).toHaveLength(0);
+    });
+
+    it('masks audience text with source OUTPUT, because Bedrock ignores anonymize on INPUT', async () => {
+      await runner().run(storyObject('Dave from ops dropped the prod database at 2am.'));
+      const mask = bedrockMock.commandCalls(ApplyGuardrailCommand, { guardrailIdentifier: 'gr-mask' });
+      expect(mask).toHaveLength(1);
+      expect(mask[0].args[0].input.source).toBe('OUTPUT');
     });
 
     it('fails closed on an intervention with no explanation', async () => {
-      bedrockMock.on(ApplyGuardrailCommand).resolves({ ...anonymized('x', 0), assessments: [] });
+      bedrockMock.on(ApplyGuardrailCommand, { guardrailIdentifier: 'gr-mask' }).resolves({ ...anonymized('x', 0), assessments: [] });
       await runner().run(storyObject('A normal story that somehow tripped the guardrail'));
       expect(graveyardReason()).toBe('moderation_blocked');
     });
@@ -243,7 +253,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
     });
 
     it('buries a story when the model wrote something the Guardrail blocks', async () => {
-      bedrockMock.on(ApplyGuardrailCommand, { source: 'OUTPUT' }).resolves(
+      bedrockMock.on(ApplyGuardrailCommand, { guardrailIdentifier: 'gr-test', source: 'OUTPUT' }).resolves(
         guard({
           action: 'GUARDRAIL_INTERVENED',
           outputs: [{ text: 'Blocked by moderation' }],
@@ -257,7 +267,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
     });
 
     it('publishes the masked headline when the model names someone', async () => {
-      bedrockMock.on(ApplyGuardrailCommand, { source: 'OUTPUT' }).resolves(
+      bedrockMock.on(ApplyGuardrailCommand, { guardrailIdentifier: 'gr-test', source: 'OUTPUT' }).resolves(
         guard({
           action: 'GUARDRAIL_INTERVENED',
           outputs: [{ text: '{NAME} discovers DNS, regrets it\n\nOne week TTL on a record' }],
@@ -293,8 +303,8 @@ describe('pipeline execution (mocked Bedrock)', () => {
     expect(res.status).toBe('SUCCEEDED');
     expect(graveyardReason()).toBe('invalid_model_output');
     expect(bedrockMock.commandCalls(ConverseCommand)).toHaveLength(3);
-    // 1 guardrail + 3 classify calls
-    expect(docMock.commandCalls(UpdateCommand)).toHaveLength(4);
+    // input check + masking + 3 classify calls
+    expect(docMock.commandCalls(UpdateCommand)).toHaveLength(5);
   });
 
   it('routes Bedrock access errors to the Graveyard, never a failed execution', async () => {
