@@ -223,7 +223,7 @@
     into.replaceChildren();
     let list = null;
     for (const raw of md.split('\n')) {
-      const line = raw.trim().replace(/\*\*(.+?)\*\*/g, '$1').replace(/^\*(?!\s)|(?<!\s)\*$/g, '');
+      const line = raw.trim().replace(/\*\*(.+?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').replace(/^\*(?!\s)|(?<!\s)\*$/g, '');
       if (!line) { list = null; continue; }
       const h = /^#{1,6}\s+(.*)$/.exec(line);
       const li = /^(?:[-*•]|\d+[.)])\s+(.*)$/.exec(line);
