@@ -39,12 +39,12 @@ Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Apply Redact
                     |                                v                                          |
                     |                       Redact Blocked Story                                v
                     v                                |     Is It a Story? -> Moderate Output -> Output Passed? -> Publish to Board -> Published
-             Send to Graveyard  <--------------------+---------------------- Reason: Output Blocked / Invalid Model Output / Pipeline Error
+             Send to Graveyard  <--------------------+---------------------- Reason: Not a Story / Output Blocked / Invalid Model Output / Pipeline Error
              (Queue for Review + Record in Graveyard) -> Rejected
 ```
 
 - One execution per story (no Map state). Each one can be opened in the console during the talk.
-- Every failure path ends in `Rejected`, a Succeed state. Bad input never fails an execution.
+- Every failure path ends in `Rejected`, a Succeed state. Bad input never fails an execution. Lambda errors are caught too: `Load Story` goes to `Reason: Unreadable Story`, `Moderate` to `Reason: Moderation Unavailable`.
 - `Classify and Validate` is a Parallel with one branch. That lets a single native Retry re-run both steps when the model returns something that fails the zod schema.
 - `Load Story` normalizes text first (look-alike characters, invisible and direction-flipping characters, spaced-out letters) so filter-evasion tricks stop working.
 - `Apply Redactions` swaps in the Guardrail's masked text, so names, links, and secrets become `[name]`, `[link]`, `[token]` before the model, the table, or the board see them.
@@ -61,6 +61,13 @@ Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Apply Redact
    - Postmortem: `us.anthropic.claude-sonnet-4-6` (Claude Sonnet 4.6)
 
    If your account has never used Anthropic models on Bedrock, submit the one-time use case form in the Bedrock console first.
+
+   **Invoke each model once yourself.** The first call to an Anthropic model in an account quietly subscribes the account to it through AWS Marketplace, and the caller needs `aws-marketplace:Subscribe`. The Lambda roles only have `bedrock:InvokeModel`, so if a Lambda makes that first call it fails with `AccessDeniedException ... AWS Marketplace actions`. Call each model once with your own admin credentials before the demo, then wait about 5 minutes:
+   ```bash
+   for m in us.anthropic.claude-haiku-4-5-20251001-v1:0 us.anthropic.claude-sonnet-4-6; do
+     aws bedrock-runtime converse --model-id "$m" --messages '[{"role":"user","content":[{"text":"hi"}]}]' --inference-config maxTokens=10 --query stopReason
+   done
+   ```
 
    **Check quotas, not just access.** A model can be listed as ACTIVE and still have a quota of 0. New accounts start with 0 tokens per minute for Claude 5.x models on Bedrock, which is why the postmortem defaults to Sonnet 4.6. New accounts also get only 10 concurrent Lambda executions; request 1,000 in Service Quotas (Lambda, "Concurrent executions") a few days before the talk. Haiku 4.5 allows 50 requests per minute by default; the pipeline retries patiently on throttling, so a burst arrives late rather than in the Graveyard.
    ```bash
@@ -98,7 +105,7 @@ npm run synth            # cdk synth, all three stacks
 npm run deploy           # cdk deploy --all, writes cdk-outputs.json for the scripts
 npm run presenter-key    # creates the key and prints the presenter board URL
 npm run qr               # QR codes in qr/
-npm run seed             # 20 stories through the real API
+npm run seed             # 22 stories through the real API
 npm run teardown         # after the talk
 ```
 
@@ -186,7 +193,7 @@ It listens on 127.0.0.1 only, requires the random token from the printed URL, an
 - **Kill switch:** one DynamoDB item, read with a consistent read on every submit.
 - **Presenter key:** postmortems cost real money, so `POST /api/postmortem` needs the key from SSM (SecureString). The board reads it from `#key=` once, keeps it in sessionStorage for that tab, and removes it from the address bar.
 - **Profanity:** allowed through the pipeline (the Guardrail has no profanity filter), stored as written, and censored on the way out by the board and postmortem APIs (`fucking` shows as `f******`). The word list is in [src/shared/censor.ts](src/shared/censor.ts).
-- **Output:** the board renders every string with `textContent`. CloudFront adds a strict Content-Security-Policy (no inline scripts or styles).
+- **Output:** the board renders every string with `textContent`. CloudFront adds a strict Content-Security-Policy (no inline scripts or styles, nothing from other origins), which is why the fonts are self-hosted in [web/fonts/](web/fonts/).
 - **IAM:** every grant is scoped to a specific resource. Bedrock `InvokeModel` is scoped to the configured inference profile and the regions it routes to.
 - **No naming and shaming:** the Guardrail anonymizes personal names, usernames, and `@handles` instead of blocking the story. "Dave from ops dropped prod" is published as "[name] from ops dropped prod". The masked text is what gets classified, stored, and shown, and the classifier and postmortem prompts both say never to name a person.
 - **Privacy:** the Guardrail blocks emails, phone numbers, addresses, card numbers, passwords, and AWS keys. Story text is logged only at DEBUG (off). Raw S3 objects expire after one day. Step Functions keeps execution input and output until the state machine is deleted by teardown. The `Load Story` output there still has the original text, names included; every later state has the masked text.
@@ -196,6 +203,7 @@ It listens on 127.0.0.1 only, requires the random token from the printed URL, an
 ### The day before
 
 - [ ] `npm test` passes and `npm run deploy` succeeds in the presenting account.
+- [ ] Both models invoked once with your own credentials (see Prerequisites).
 - [ ] Lambda concurrent executions is 1,000, not 10 (see Prerequisites).
 - [ ] Load test: 60 stories at once with `npm run seed -- --burst 60`, then `npm run reset`.
 - [ ] `npm run presenter-key`. Bookmark the printed URL on the presenter laptop only.
@@ -242,7 +250,7 @@ Press `P` (or click **Postmortem**) to write one for the scariest story. To pick
 | Postmortem "failed its own moderation review" | The Guardrail blocked what the model wrote. Shift+click Postmortem to regenerate, or pick another story. |
 | Postmortem button missing | The board was opened without `#key=`. Open the bookmark from `npm run presenter-key`. |
 | Postmortem says "Presenter key required" | The key was rotated. Re-run `npm run presenter-key` and use the new URL. Lambdas pick it up within a minute. |
-| Postmortem "had its own incident" | Postmortem model access or ID. Check the PostmortemWorker logs. The rest of the demo is unaffected. |
+| Postmortem "had its own incident" | Postmortem model access or ID. Check the PostmortemWorker logs. An `AccessDeniedException` about AWS Marketplace means the model was never invoked by an admin (see Prerequisites); invoke it once, wait 5 minutes, then Shift+P. The rest of the demo is unaffected. |
 | Phones get "One story every 20 seconds" | Working as intended. |
 | Whole room gets errors | Stage throttle (20 rps). Raise it in [lib/ingestion-stack.ts](lib/ingestion-stack.ts). |
 

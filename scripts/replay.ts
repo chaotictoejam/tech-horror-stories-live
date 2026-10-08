@@ -96,7 +96,7 @@ function postmortemView(id: string) {
   return { status: 200, body: ready ? pm : { ...pm, status: 'pending', postmortem: undefined } };
 }
 
-const TYPES: Record<string, string> = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png' };
+const TYPES: Record<string, string> = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://localhost:${port}`);
