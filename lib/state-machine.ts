@@ -108,6 +108,7 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
   const redact = reasonState(scope, 'Redact Blocked Story', 'moderation_blocked', { keepText: false, detail: { path: '$.moderation.detail' } }).next(graveyard);
   const invalidOutput = reasonState(scope, 'Reason: Invalid Model Output', 'invalid_model_output', { keepText: true, detail: 'schema' }).next(graveyard);
   const pipelineError = reasonState(scope, 'Reason: Pipeline Error', 'other', { keepText: true, detail: 'error' }).next(graveyard);
+  const notAStory = reasonState(scope, 'Reason: Not a Story', 'not_a_story', { keepText: false, detail: 'model' }).next(graveyard);
   const outputBlocked = reasonState(scope, 'Reason: Output Blocked', 'invalid_model_output', { keepText: true, detail: { path: '$.outputCheck.detail' } }).next(graveyard);
 
   const loadStory = new tasks.LambdaInvoke(scope, 'Load Story', {
@@ -156,6 +157,7 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
       'fear_level.$': '$[0].fear_level',
       'root_cause.$': '$[0].root_cause',
       'survivable.$': '$[0].survivable',
+      'is_story.$': '$[0].is_story',
       'one_liner.$': '$[0].one_liner',
       'model.$': '$[0].model',
       'input_tokens.$': '$[0].input_tokens',
@@ -223,9 +225,14 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
     .when(sfn.Condition.booleanEquals('$.outputCheck.blocked', true), outputBlocked)
     .otherwise(publish.next(new sfn.Succeed(scope, 'Published')));
 
+  // The classifier flags heckles and chatter. They skip the output check and go straight to the Graveyard.
+  const isStory = new sfn.Choice(scope, 'Is It a Story?')
+    .when(sfn.Condition.booleanEquals('$.verdict.is_story', false), notAStory)
+    .otherwise(moderateOutput.next(outputPassed));
+
   const passedModeration = new sfn.Choice(scope, 'Passed Moderation?')
     .when(sfn.Condition.booleanEquals('$.moderation.blocked', true), redact)
-    .otherwise(applyRedactions.next(classifyAndValidate).next(moderateOutput).next(outputPassed));
+    .otherwise(applyRedactions.next(classifyAndValidate).next(isStory));
 
   const usable = new sfn.Choice(scope, 'Is Story Usable?')
     .when(sfn.Condition.booleanEquals('$.story.usable', true), moderate.next(passedModeration))

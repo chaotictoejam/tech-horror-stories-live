@@ -9,9 +9,10 @@
     too_long: 'Too long',
     other: 'Pipeline error',
     removed: 'Removed by you',
+    not_a_story: 'Not a story',
   };
   // Mirrors the board: these reasons never show text there.
-  const HIDDEN = new Set(['moderation_blocked', 'removed']);
+  const HIDDEN = new Set(['moderation_blocked', 'removed', 'not_a_story']);
   let submissionsOpen = true;
 
   function el(tag, cls, text) {

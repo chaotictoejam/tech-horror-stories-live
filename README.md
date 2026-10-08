@@ -38,7 +38,7 @@ Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Apply Redact
                     |                                |                                   Retry x2 on InvalidModelOutput)
                     |                                v                                          |
                     |                       Redact Blocked Story                                v
-                    v                                |                       Moderate Output -> Output Passed? -> Publish to Board -> Published
+                    v                                |     Is It a Story? -> Moderate Output -> Output Passed? -> Publish to Board -> Published
              Send to Graveyard  <--------------------+---------------------- Reason: Output Blocked / Invalid Model Output / Pipeline Error
              (Queue for Review + Record in Graveyard) -> Rejected
 ```
@@ -48,6 +48,7 @@ Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Apply Redact
 - `Classify and Validate` is a Parallel with one branch. That lets a single native Retry re-run both steps when the model returns something that fails the zod schema.
 - `Load Story` normalizes text first (look-alike characters, invisible and direction-flipping characters, spaced-out letters) so filter-evasion tricks stop working.
 - `Apply Redactions` swaps in the Guardrail's masked text, so names, links, and secrets become `[name]`, `[link]`, `[token]` before the model, the table, or the board see them.
+- `Is It a Story?` sends heckles and chatter the classifier flagged (`is_story: false`) to the Graveyard.
 - `Moderate Output` runs the model's headline and root cause back through the same Guardrail before publishing.
 - Text that never passed moderation is blanked before it reaches the Graveyard. The board also hides moderated text in the API response.
 
@@ -95,7 +96,7 @@ npm run teardown         # after the talk
 
 | Script | What it does |
 |---|---|
-| `npm run seed [-- --fast]` | Submits the 21 seed stories (15 good, two with a little swearing that the board censors; 2 empty or gibberish; 1 personal data; 1 with too much swearing; 2 prompt injections) |
+| `npm run seed [-- --fast]` | Submits the 22 seed stories (15 good, two with a little swearing that the board censors; 2 empty or gibberish; 1 personal data; 1 heckle; 1 with too much swearing; 2 prompt injections) |
 | `npm run qr` | `qr/submit-slide.{png,svg}` (1600px) and `qr/submit-corner.{png,svg}` (200px) for the submit URL |
 | `npm run admin` | Local presenter page: bury or restore stories, open or close submissions |
 | `npm run reset` | Empties the board: every story, Graveyard entry, cached postmortem, and the cost counter. Asks you to type `reset`. Infrastructure, presenter key, and kill switch are untouched |
@@ -146,6 +147,7 @@ There are two guardrails. The main one makes block decisions and reviews model o
 | Emails, phone numbers, addresses, card numbers, passwords, AWS keys | Block | Story and model output |
 | Names, usernames, `@handles` | Mask as `[name]` | Story and model output |
 | IP addresses, URLs, 12 digit account ids, GitHub/Slack/OpenAI tokens, JWTs, private key headers, `*.internal` style hosts | Mask as `[ip]`, `[link]`, `[account id]`, `[token]`, `[key]`, `[host]` | Story and model output |
+| Heckles and chatter ("this is dumb", "boring", "test") | Graveyard as "Not a story", text hidden. Short ones (6 words or fewer) are caught by a free text check; longer ones by the classifier's `is_story` field | Load Story, Classify |
 | Profanity | One or two words: allowed and censored on display (`f******`), including `sh1t`, `f*ck`, `f u c k`. Three or more: Graveyard (`PROFANITY_LIMIT` in [config/app-config.ts](config/app-config.ts)) | Load Story, board and postmortem APIs |
 | Postmortems | Whole text reviewed; a blocked one shows "failed its own moderation review" | Postmortem worker |
 

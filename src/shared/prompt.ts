@@ -35,6 +35,7 @@ export function buildClassifierPrompt(text: string, nonce?: string) {
     ' "fear_level": integer 1 to 10 (10 = career-ending),',
     ' "root_cause": string, at most 8 words,',
     ' "survivable": boolean,',
+    ' "is_story": boolean, false when the text is not an account of a tech incident, for example a comment or complaint about this talk, the demo, the speaker, or the audience, or random chatter. When false, use category "other", fear_level 1, and short neutral strings for the other fields.',
     ' "one_liner": string, at most 12 words, a deadpan news headline about the incident}',
     'Never include a person\'s name, username, or a real company name in any field; say "an engineer" or "the company". Never joke about suicide or self-harm. Do not use em dashes. Do not add any other keys.',
   ].join('\n');

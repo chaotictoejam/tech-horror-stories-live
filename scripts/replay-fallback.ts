@@ -38,6 +38,7 @@ const GRAVE_REASONS: Record<string, [string, string]> = {
   moderation: ['moderation_blocked', 'pii'],
   injection: ['moderation_blocked', 'content:PROMPT_ATTACK'],
   profanity: ['moderation_blocked', 'profanity'],
+  heckle: ['not_a_story', 'heckle'],
 };
 
 const POSTMORTEM = `## Summary

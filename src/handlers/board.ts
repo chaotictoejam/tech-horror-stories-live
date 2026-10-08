@@ -46,7 +46,8 @@ const feedCard = (r: StoryRow) => ({
 
 // Text blocked by moderation or removed by the presenter is never sent to the browser.
 // Everything else is censored for profanity on the way out.
-const HIDDEN_REASONS = new Set(['moderation_blocked', 'removed']);
+// Heckles are hidden too: no free projector time for hecklers.
+const HIDDEN_REASONS = new Set(['moderation_blocked', 'removed', 'not_a_story']);
 const graveCard = (r: StoryRow) => ({
   id: r.id,
   createdAt: r.createdAt,

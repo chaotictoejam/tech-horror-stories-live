@@ -28,6 +28,7 @@ const GOOD = {
   fear_level: 7,
   root_cause: 'One week TTL on a record',
   survivable: true,
+  is_story: true,
   one_liner: 'Local team discovers DNS, regrets it',
 };
 
@@ -125,6 +126,8 @@ describe('state machine definition', () => {
         'Published',
         'Reason: Invalid Model Output',
         'Reason: Moderation Unavailable',
+        'Reason: Not a Story',
+        'Is It a Story?',
         'Reason: Output Blocked',
         'Reason: Pipeline Error',
         'Reason: Unreadable Story',
@@ -146,7 +149,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
   it('publishes a good story with tokens and cost', async () => {
     const res = await runner().run(storyObject('The site was down for 6 hours. It was DNS. The TTL was a week.'));
     expect(res.status).toBe('SUCCEEDED');
-    expect(res.path).toEqual(['Load Story', 'Is Story Usable?', 'Moderate', 'Passed Moderation?', 'Apply Redactions', 'Classify and Validate', 'Classify', 'Validate Output', 'Moderate Output', 'Output Passed?', 'Publish to Board', 'Published']);
+    expect(res.path).toEqual(['Load Story', 'Is Story Usable?', 'Moderate', 'Passed Moderation?', 'Apply Redactions', 'Classify and Validate', 'Classify', 'Validate Output', 'Is It a Story?', 'Moderate Output', 'Output Passed?', 'Publish to Board', 'Published']);
     const item = published();
     expect(item.category.S).toBe('it_was_dns');
     expect(item.fear_level.N).toBe('7');
@@ -164,6 +167,8 @@ describe('pipeline execution (mocked Bedrock)', () => {
     ['empty', 'gibberish', 'asdfjkl;;; qwrtzp xxxx 12345 !!!! zzzzzzz'],
     ['too_long', 'too_long', 'a story '.repeat(40)],
     ['moderation_blocked', 'profanity', 'Fucking Jenkins. Fucking YAML. Shit broke at 2am and nobody answered.'],
+    ['not_a_story', 'heckle', 'This is dumb'],
+    ['not_a_story', 'chatter', 'test'],
   ])('sends %s (%s) input to the Graveyard without calling Bedrock', async (reason, detail, text) => {
     const res = await runner().run(storyObject(text));
     expect(res.status).toBe('SUCCEEDED');
@@ -247,6 +252,17 @@ describe('pipeline execution (mocked Bedrock)', () => {
       await runner().run(storyObject('A normal story that somehow tripped the guardrail'));
       expect(graveyardReason()).toBe('moderation_blocked');
     });
+  });
+
+  it('buries a longer heckle the classifier flags, without the output check or the board', async () => {
+    bedrockMock.on(ConverseCommand).resolves(converseReply(JSON.stringify({ ...GOOD, is_story: false, category: 'other', fear_level: 1 })));
+    const res = await runner().run(storyObject('Why are we even doing this, nobody in this room has ever run anything in production.'));
+    expect(res.path).toContain('Reason: Not a Story');
+    expect(res.path).not.toContain('Moderate Output');
+    expect(graveyardReason()).toBe('not_a_story');
+    expect(graveyardDetail()).toBe('model');
+    expect(putItems.find((i) => i.status.S === 'graveyard').text.S).toBe('');
+    expect(published()).toBeUndefined();
   });
 
   describe('model output moderation', () => {

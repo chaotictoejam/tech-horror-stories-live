@@ -1,6 +1,7 @@
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { PROFANITY_LIMIT, STORY_MAX_CHARS } from '../../config/app-config.js';
 import { countProfanity } from '../shared/censor.js';
+import { classifyShortText } from '../shared/heckle.js';
 import type { GraveyardReason } from '../shared/schema.js';
 import { log } from '../shared/log.js';
 import { normalizeStory } from '../shared/normalize.js';
@@ -19,7 +20,7 @@ export interface LoadedStory {
   text: string;
   usable: boolean;
   reason?: GraveyardReason;
-  /** Why it is unusable, for the Graveyard quip: blank, gibberish, too_long, profanity, unreadable. */
+  /** Why it is unusable, for the Graveyard quip: blank, gibberish, too_long, profanity, heckle, chatter, unreadable. */
   detail?: string;
 }
 
@@ -35,6 +36,9 @@ export function isGibberish(text: string): boolean {
 export function assess(text: unknown): { usable: boolean; reason?: GraveyardReason; detail?: string } {
   if (typeof text !== 'string' || text.trim().length === 0) return { usable: false, reason: 'empty', detail: 'blank' };
   if (text.length > STORY_MAX_CHARS) return { usable: false, reason: 'too_long', detail: 'too_long' };
+  // Before the gibberish check, so "test" or "booo" gets the chatter or heckle quip.
+  const notAStory = classifyShortText(text);
+  if (notAStory) return { usable: false, reason: 'not_a_story', detail: notAStory };
   if (isGibberish(text)) return { usable: false, reason: 'empty', detail: 'gibberish' };
   // A couple of swear words get censored on the board. A torrent of them gets buried.
   if (countProfanity(text) >= PROFANITY_LIMIT) return { usable: false, reason: 'moderation_blocked', detail: 'profanity' };

@@ -33,6 +33,16 @@ const QUIPS: Record<string, string[]> = {
   ],
   'moderation_blocked': ['The moderator had a gut feeling about this one.', 'Blocked by moderation. You know what you did.'],
 
+  // Heckles and chatter
+  'not_a_story/heckle': [
+    'Feedback noted. Your ticket has been assigned to nobody.',
+    'Heckle received. Severity: low. Priority: never.',
+    'Thank you for your feedback. It has been piped to /dev/null.',
+    'Bold words from someone who has not submitted a story.',
+  ],
+  'not_a_story/chatter': ['Testing in production, I see.', 'This is a story box, not a chat window.', 'Hi. Now tell us about the time prod went down.'],
+  'not_a_story': ['That is not a horror story. That is a vibe.', 'We asked for an incident, not a comment.', 'Feedback noted. Your ticket has been assigned to nobody.'],
+
   // Load Story checks
   'empty/blank': ['A bold story about nothing. Very minimalist.', 'The quietest incident report we have ever received.'],
   'empty/gibberish': ['Did you deploy your keyboard to prod?', 'This looks like a base64 string that gave up.'],

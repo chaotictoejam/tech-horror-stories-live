@@ -22,6 +22,7 @@
     too_long: 'Too long',
     other: 'Pipeline error',
     removed: 'Removed by presenter',
+    not_a_story: 'Not a story',
   };
 
   // ---------- Presenter key: passed once as board.html#key=..., kept for this tab only ----------
@@ -161,7 +162,7 @@
       why.append(el('span', 'reason', REASON_LABELS[g.reason] || 'Pipeline error'));
       if (g.quip) why.append(el('span', 'quip', g.quip));
       li.append(why);
-      if (g.reason === 'moderation_blocked' || g.reason === 'removed') {
+      if (g.reason === 'moderation_blocked' || g.reason === 'removed' || g.reason === 'not_a_story') {
         li.append(el('span', 'text redacted', 'Story redacted'));
       } else if (g.text) {
         li.append(el('span', 'text', g.text));

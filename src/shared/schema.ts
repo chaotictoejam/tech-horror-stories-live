@@ -13,7 +13,7 @@ export const CATEGORIES = [
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 
-export const GRAVEYARD_REASONS = ['empty', 'moderation_blocked', 'invalid_model_output', 'too_long', 'other', 'removed'] as const;
+export const GRAVEYARD_REASONS = ['empty', 'moderation_blocked', 'invalid_model_output', 'too_long', 'other', 'removed', 'not_a_story'] as const;
 export type GraveyardReason = (typeof GRAVEYARD_REASONS)[number];
 
 const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
@@ -25,6 +25,8 @@ export const ClassificationSchema = z
     fear_level: z.number().int().min(1).max(10),
     root_cause: z.string().trim().min(1).refine((s) => wordCount(s) <= 8, 'root_cause must be 8 words or fewer'),
     survivable: z.boolean(),
+    // False for heckles and chatter ("this is dumb"): routed to the Graveyard, not the board.
+    is_story: z.boolean(),
     one_liner: z
       .string()
       .trim()

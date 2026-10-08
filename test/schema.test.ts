@@ -6,6 +6,7 @@ const good = {
   fear_level: 8,
   root_cause: 'Deployed at 4:55 on Friday',
   survivable: true,
+  is_story: true,
   one_liner: 'Engineer discovers weekends are optional',
 };
 
@@ -42,6 +43,10 @@ describe('validateClassification', () => {
   it('rejects extra keys so story text cannot extend the schema', () => {
     const r = validateClassification(JSON.stringify({ ...good, admin: true }));
     expect(r.ok).toBe(false);
+  });
+
+  it('requires is_story to be a boolean', () => {
+    expect(validateClassification(JSON.stringify({ ...good, is_story: 'yes' })).ok).toBe(false);
   });
 
   it('rejects missing keys', () => {
