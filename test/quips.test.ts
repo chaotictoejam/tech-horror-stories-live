@@ -29,7 +29,7 @@ describe('quipFor', () => {
   });
 
   it('has no em or en dashes in any quip', () => {
-    for (const q of Object.values(ALL_QUIPS).flat()) expect(q).not.toMatch(/[–—]/);
+    for (const q of Object.values(ALL_QUIPS).flat()) expect(q).not.toMatch(/[\u2013\u2014]/);
   });
 });
 
