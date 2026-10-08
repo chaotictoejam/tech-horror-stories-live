@@ -1,0 +1,23 @@
+/* Self-hosted because the CSP only allows 'self'. Latin subsets from Google Fonts.
+   Creepster and VT323: SIL Open Font License 1.1. Special Elite: Apache License 2.0. */
+@font-face {
+  font-family: 'Creepster';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(creepster.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Special Elite';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(special-elite.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'VT323';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(vt323.woff2) format('woff2');
+}
