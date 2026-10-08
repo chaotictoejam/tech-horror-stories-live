@@ -21,6 +21,7 @@ const PLACEHOLDERS: Record<string, string> = {
   USERNAME: '[name]',
   Handle: '[name]',
   IP_ADDRESS: '[ip]',
+  IpAddress: '[ip]',
   URL: '[link]',
   AwsAccountId: '[account id]',
   ApiToken: '[token]',

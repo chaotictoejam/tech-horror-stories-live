@@ -20,7 +20,9 @@ import { buildPipelineDefinition } from './state-machine.js';
 const MASK_PII = ['NAME', 'USERNAME', 'IP_ADDRESS', 'URL'];
 const MASK_REGEXES: bedrock.CfnGuardrail.RegexConfigProperty[] = [
     { name: 'Handle', description: 'Social or chat handles like @dave', pattern: '@[A-Za-z0-9_.-]{2,}', action: 'ANONYMIZE' },
-    { name: 'AwsAccountId', description: '12 digit AWS account ids', pattern: '\\b[0-9]{12}\\b', action: 'ANONYMIZE' },
+    // Bedrock's IP_ADDRESS detector is a model and missed 10.2.3.4 in a live test. This regex is deterministic.
+  { name: 'IpAddress', description: 'IPv4 addresses', pattern: '\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b', action: 'ANONYMIZE' },
+  { name: 'AwsAccountId', description: '12 digit AWS account ids', pattern: '\\b[0-9]{12}\\b', action: 'ANONYMIZE' },
     {
       name: 'ApiToken',
       description: 'GitHub, Slack, and OpenAI style tokens',
