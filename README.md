@@ -95,7 +95,7 @@ npm run teardown         # after the talk
 
 | Script | What it does |
 |---|---|
-| `npm run seed [-- --fast]` | Submits the 20 seed stories (15 good, two with swearing that the board censors; 2 empty or gibberish; 1 moderation trigger; 2 prompt injections) |
+| `npm run seed [-- --fast]` | Submits the 21 seed stories (15 good, two with a little swearing that the board censors; 2 empty or gibberish; 1 personal data; 1 with too much swearing; 2 prompt injections) |
 | `npm run qr` | `qr/submit-slide.{png,svg}` (1600px) and `qr/submit-corner.{png,svg}` (200px) for the submit URL |
 | `npm run admin` | Local presenter page: bury or restore stories, open or close submissions |
 | `npm run kill` | Submit endpoint returns 503 "Submissions closed" immediately |
@@ -145,8 +145,10 @@ There are two guardrails. The main one makes block decisions and reviews model o
 | Emails, phone numbers, addresses, card numbers, passwords, AWS keys | Block | Story and model output |
 | Names, usernames, `@handles` | Mask as `[name]` | Story and model output |
 | IP addresses, URLs, 12 digit account ids, GitHub/Slack/OpenAI tokens, JWTs, private key headers, `*.internal` style hosts | Mask as `[ip]`, `[link]`, `[account id]`, `[token]`, `[key]`, `[host]` | Story and model output |
-| Profanity | Allowed, censored on display (`f******`), including `sh1t`, `f*ck`, `f u c k` | Board and postmortem APIs |
+| Profanity | One or two words: allowed and censored on display (`f******`), including `sh1t`, `f*ck`, `f u c k`. Three or more: Graveyard (`PROFANITY_LIMIT` in [config/app-config.ts](config/app-config.ts)) | Load Story, board and postmortem APIs |
 | Postmortems | Whole text reviewed; a blocked one shows "failed its own moderation review" | Postmortem worker |
+
+Every Graveyard entry records what exactly failed (for example `content:PROMPT_ATTACK`, `topic:IdentifiablePerson`, `profanity`, `gibberish`) and the board shows a canned, deadpan quip for that cause, like "Ignore previous instructions? Ignored." or "Come on, we're professionals. Allegedly." The quips are fixed text in [src/shared/quips.ts](src/shared/quips.ts), never model-generated, and the same story always gets the same quip.
 
 Anything that still slips through: bury it from the admin page (below).
 
@@ -185,7 +187,7 @@ It listens on 127.0.0.1 only, requires the random token from the printed URL, an
 - [ ] `npm test` passes and `npm run deploy` succeeds in the presenting account.
 - [ ] `npm run presenter-key`. Bookmark the printed URL on the presenter laptop only.
 - [ ] `npm run qr`. Put `qr/submit-slide.png` on the "join in" slide and `qr/submit-corner.png` in the corner of later slides.
-- [ ] `npm run seed`. Wait 30 seconds. The Feed has 15 stories and the Graveyard has the rest.
+- [ ] `npm run seed`. Wait 30 seconds. The Feed has 15 stories and the Graveyard has the rest, each with a quip.
 - [ ] Click Postmortem once to warm it up and cache it.
 - [ ] `npm run replay -- --record`, then `npm run replay` and check the offline board works.
 - [ ] Submit one story from your own phone on mobile data. It should appear within about 10 seconds.

@@ -32,11 +32,12 @@ const VERDICTS = [
   { category: 'prod_is_test', fear_level: 10, root_cause: 'Stale tmux pane connected to prod', survivable: false, one_liner: 'Local database drop goes surprisingly global' },
 ];
 
-const GRAVE_REASONS: Record<string, string> = {
-  empty: 'empty',
-  gibberish: 'empty',
-  moderation: 'moderation_blocked',
-  injection: 'moderation_blocked',
+const GRAVE_REASONS: Record<string, [string, string]> = {
+  empty: ['empty', 'blank'],
+  gibberish: ['empty', 'gibberish'],
+  moderation: ['moderation_blocked', 'pii'],
+  injection: ['moderation_blocked', 'content:PROMPT_ATTACK'],
+  profanity: ['moderation_blocked', 'profanity'],
 };
 
 const POSTMORTEM = `## Summary
@@ -78,7 +79,8 @@ export function fallbackRecording(): Recording {
       const v = VERDICTS[good++];
       feed.push({ id, createdAt, text: s.text, ...v, input_tokens: 640 + (i % 5) * 9, output_tokens: 64 + (i % 4) * 5, cost_usd: 0.00098 });
     } else {
-      graveyard.push({ id, createdAt, reason: GRAVE_REASONS[s.kind] ?? 'other', text: '' });
+      const [reason, detail] = GRAVE_REASONS[s.kind] ?? ['other', 'error'];
+      graveyard.push({ id, createdAt, reason, detail, text: '' });
     }
   });
   const scariestRmRf = feed.find((f) => f.category === 'rm_rf_moment');

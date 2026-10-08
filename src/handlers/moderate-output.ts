@@ -10,6 +10,8 @@ export interface ModerateOutputInput {
 export interface ModerateOutputResult {
   blocked: boolean;
   policies: string[];
+  /** Why the model's text was blocked, prefixed with "output:". Empty if not blocked. */
+  detail: string;
   one_liner: string;
   root_cause: string;
   guardrail_units: number;
@@ -29,6 +31,7 @@ export const handler = async (input: ModerateOutputInput): Promise<ModerateOutpu
   return {
     blocked,
     policies: verdict.policies,
+    detail: blocked ? `output:${verdict.detail || 'unknown'}` : '',
     one_liner: blocked ? '' : parts[0].trim(),
     root_cause: blocked ? '' : parts[1].trim(),
     guardrail_units: verdict.guardrail_units,

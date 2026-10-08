@@ -24,4 +24,6 @@ export function loadConfig(app: App): AppConfig {
 export const PREFIX = 'TechHorror';
 export const STORY_MAX_CHARS = 280;
 export const COOLDOWN_SECONDS = 20;
+// A few swear words are censored on the board. This many or more sends the story to the Graveyard.
+export const PROFANITY_LIMIT = 3;
 export const PRESENTER_KEY_PARAM = '/tech-horror/presenter-key';

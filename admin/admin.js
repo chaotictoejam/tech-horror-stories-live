@@ -99,7 +99,10 @@
       grave.replaceChildren(
         ...s.graveyard.map((r) => {
           const tr = el('tr');
-          tr.append(el('td', 'reason' + (r.reason === 'removed' ? ' removed' : ''), REASONS[r.reason] || r.reason));
+          const why = el('td', 'reason' + (r.reason === 'removed' ? ' removed' : ''), REASONS[r.reason] || r.reason);
+          if (r.detail) why.append(el('div', 'detail', r.detail));
+          if (r.quip) why.append(el('div', 'quip', r.quip));
+          tr.append(why);
           const textCell = el('td');
           if (HIDDEN.has(r.reason) || !r.text) textCell.append(el('span', 'hidden-text', HIDDEN.has(r.reason) ? 'Hidden on the board' : '(empty)'));
           else textCell.textContent = r.text;

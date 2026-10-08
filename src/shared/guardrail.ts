@@ -7,6 +7,8 @@ export interface GuardrailVerdict {
   blocked: boolean;
   /** Policy names that blocked, for the execution history. Never the matched text. */
   policies: string[];
+  /** The most specific policy that blocked, like "content:HATE" or "topic:Threats". Empty if not blocked. */
+  detail: string;
   /** How many names, links, hosts, or tokens were masked. */
   redactions: number;
   /** The text with masked spans replaced by friendly placeholders. Empty when blocked. */
@@ -48,7 +50,7 @@ export function summarize(res: ApplyGuardrailCommandOutput) {
     const pii = a.sensitiveInformationPolicy?.piiEntities ?? [];
     const regexes = a.sensitiveInformationPolicy?.regexes ?? [];
     const words = [...(a.wordPolicy?.customWords ?? []), ...(a.wordPolicy?.managedWordLists ?? [])];
-    if (content.some((f) => f.action === 'BLOCKED')) policies.add('content');
+    for (const f of content) if (f.action === 'BLOCKED') policies.add(`content:${f.type}`);
     for (const t of topics) if (t.action === 'BLOCKED') policies.add(`topic:${t.name}`);
     if ([...pii, ...regexes].some((p) => p.action === 'BLOCKED')) policies.add('pii');
     if (words.some((w) => w.action === 'BLOCKED')) policies.add('words');
@@ -90,6 +92,7 @@ export async function applyGuardrail(
   return {
     blocked,
     policies,
+    detail: blocked ? (policies[0] ?? 'unknown') : '',
     redactions,
     text: blocked ? '' : intervened ? friendlyPlaceholders(masked) : text,
     guardrail_units: units,

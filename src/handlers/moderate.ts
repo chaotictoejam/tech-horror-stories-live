@@ -30,6 +30,7 @@ export const handler = async (input: ModerateInput): Promise<ModerateOutput> => 
   const result: ModerateOutput = {
     blocked,
     policies: blocked ? ['masking'] : verdict.policies,
+    detail: blocked ? 'unknown' : '',
     redactions: masked.redactions,
     text: blocked ? '' : masked.text,
     guardrail_units: verdict.guardrail_units + masked.guardrail_units,

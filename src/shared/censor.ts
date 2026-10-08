@@ -38,3 +38,8 @@ export function censor(text: string | undefined): string | undefined {
   if (!text) return text;
   return collapseSpacedLetters(text).replace(PATTERN, mask);
 }
+
+/** How many profane words a text contains, counting the same evasions censor() catches. */
+export function countProfanity(text: string): number {
+  return collapseSpacedLetters(text).match(PATTERN)?.length ?? 0;
+}

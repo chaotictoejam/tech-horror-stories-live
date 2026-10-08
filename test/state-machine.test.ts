@@ -68,6 +68,7 @@ function storyObject(text: string, id = 'abcd1234-0000') {
 }
 
 const graveyardReason = () => putItems.find((i) => i.status.S === 'graveyard')?.reason.S;
+const graveyardDetail = () => putItems.find((i) => i.status.S === 'graveyard')?.detail.S;
 const published = () => putItems.find((i) => i.status.S === 'published');
 
 beforeAll(async () => {
@@ -159,16 +160,19 @@ describe('pipeline execution (mocked Bedrock)', () => {
   });
 
   it.each([
-    ['empty', '   '],
-    ['empty', 'asdfjkl;;; qwrtzp xxxx 12345 !!!! zzzzzzz'],
-    ['too_long', 'a story '.repeat(40)],
-  ])('sends %s input to the Graveyard without calling Bedrock', async (reason, text) => {
+    ['empty', 'blank', '   '],
+    ['empty', 'gibberish', 'asdfjkl;;; qwrtzp xxxx 12345 !!!! zzzzzzz'],
+    ['too_long', 'too_long', 'a story '.repeat(40)],
+    ['moderation_blocked', 'profanity', 'Fucking Jenkins. Fucking YAML. Shit broke at 2am and nobody answered.'],
+  ])('sends %s (%s) input to the Graveyard without calling Bedrock', async (reason, detail, text) => {
     const res = await runner().run(storyObject(text));
     expect(res.status).toBe('SUCCEEDED');
     expect(res.path.at(-1)).toBe('Rejected');
     expect(graveyardReason()).toBe(reason);
+    expect(graveyardDetail()).toBe(detail);
+    expect(putItems.find((i) => i.status.S === 'graveyard').text.S).toBe('');
     expect(bedrockMock.calls()).toHaveLength(0);
-    expect(sqsMessages[0]).toMatchObject({ reason });
+    expect(sqsMessages[0]).toMatchObject({ reason, detail });
   });
 
   it('redacts stories blocked by moderation', async () => {
@@ -181,6 +185,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
     const res = await runner().run(storyObject('email me at someone@example.com about the outage please'));
     expect(res.path).toContain('Redact Blocked Story');
     expect(graveyardReason()).toBe('moderation_blocked');
+    expect(graveyardDetail()).toBe('pii');
     const grave = putItems.find((i) => i.status.S === 'graveyard');
     expect(grave.text.S).toBe('');
     expect(JSON.stringify(res.output)).not.toContain('someone@example.com');
@@ -263,6 +268,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
       const res = await runner().run(storyObject('The pager went off 40 times in one night and I was done with everything.'));
       expect(res.path).toContain('Reason: Output Blocked');
       expect(graveyardReason()).toBe('invalid_model_output');
+      expect(graveyardDetail()).toBe('output:topic:SelfHarmJokes');
       expect(published()).toBeUndefined();
     });
 
@@ -302,6 +308,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
     const res = await runner().run(storyObject('Our pager went off for the pager service being down.'));
     expect(res.status).toBe('SUCCEEDED');
     expect(graveyardReason()).toBe('invalid_model_output');
+    expect(graveyardDetail()).toBe('schema');
     expect(bedrockMock.commandCalls(ConverseCommand)).toHaveLength(3);
     // input check + masking + 3 classify calls
     expect(docMock.commandCalls(UpdateCommand)).toHaveLength(5);
@@ -313,6 +320,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
     const res = await runner().run(storyObject('Someone ran the migration twice and now every user has two emails.'));
     expect(res.status).toBe('SUCCEEDED');
     expect(graveyardReason()).toBe('other');
+    expect(graveyardDetail()).toBe('error');
   });
 
   it('redacts text when moderation itself is unavailable', async () => {
@@ -326,6 +334,7 @@ describe('pipeline execution (mocked Bedrock)', () => {
     const res = await runner().run({ bucket: 'raw', key: 'stories/../../etc/passwd' });
     expect(res.status).toBe('SUCCEEDED');
     expect(graveyardReason()).toBe('other');
+    expect(graveyardDetail()).toBe('unreadable');
   });
 });
 
@@ -367,5 +376,6 @@ describe('prompt injection test set', () => {
     });
     await runner().run(storyObject(injections[0].text));
     expect(graveyardReason()).toBe('moderation_blocked');
+    expect(graveyardDetail()).toBe('content:PROMPT_ATTACK');
   });
 });

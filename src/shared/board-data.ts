@@ -16,6 +16,7 @@ export interface StoryRow {
   cost_usd?: number;
   moderation_cost_usd?: number;
   reason?: string;
+  detail?: string;
   postmortem_status?: string;
 }
 

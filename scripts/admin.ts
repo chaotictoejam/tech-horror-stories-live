@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { queryByStatus } from '../src/shared/board-data.js';
 import { bury, restore } from '../src/shared/bury.js';
 import { censor } from '../src/shared/censor.js';
+import { quipFor } from '../src/shared/quips.js';
 import { argValue, loadOutputs } from './outputs.js';
 
 const outputs = await loadOutputs();
@@ -56,6 +57,8 @@ async function state() {
     category: r.category,
     fear_level: r.fear_level,
     reason: r.reason,
+    detail: r.detail,
+    quip: r.status === 'graveyard' ? quipFor(r) : undefined,
   });
   return { submissionsOpen: kill.Item?.open !== false, published: published.map(row), graveyard: graveyard.map(row), boardUrl: outputs.boardUrl };
 }

@@ -2,6 +2,7 @@ import { ListExecutionsCommand, SFNClient } from '@aws-sdk/client-sfn';
 import { GetCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import { censor } from '../shared/censor.js';
+import { quipFor } from '../shared/quips.js';
 import { CATEGORIES } from '../shared/schema.js';
 import { queryByStatus, scariest, type StoryRow } from '../shared/board-data.js';
 import { json } from '../shared/http.js';
@@ -50,6 +51,7 @@ const graveCard = (r: StoryRow) => ({
   id: r.id,
   createdAt: r.createdAt,
   reason: r.reason ?? 'other',
+  quip: quipFor(r),
   text: HIDDEN_REASONS.has(r.reason ?? '') ? '' : censor(r.text ?? ''),
 });
 

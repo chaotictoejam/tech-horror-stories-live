@@ -10,6 +10,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
+import { quipFor } from '../src/shared/quips.js';
 import { CATEGORIES } from '../src/shared/schema.js';
 import { arg, argValue, loadOutputs } from './outputs.js';
 import { fallbackRecording, type Recording } from './replay-fallback.js';
@@ -55,7 +56,10 @@ function boardSnapshot() {
   const n = revealedCount();
   const shown = timeline.slice(0, n);
   const feed = shown.filter((t) => t.kind === 'feed').map((t) => t.item).reverse();
-  const graveyard = shown.filter((t) => t.kind === 'grave').map((t) => t.item).reverse();
+  const graveyard = shown
+    .filter((t) => t.kind === 'grave')
+    .map((t) => ({ ...t.item, quip: t.item.quip ?? quipFor(t.item) }))
+    .reverse();
   const categories = Object.fromEntries(CATEGORIES.map((c) => [c, 0]));
   for (const s of feed) categories[s.category] = (categories[s.category] ?? 0) + 1;
   const leaderboard = [...feed].sort((a, b) => b.fear_level - a.fear_level || b.createdAt.localeCompare(a.createdAt)).slice(0, 3);

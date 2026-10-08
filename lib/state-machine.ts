@@ -35,8 +35,17 @@ const S = (path: string) => tasks.DynamoAttributeValue.fromString(sfn.JsonPath.s
 // DynamoDB wants numbers as strings, so serialize with States.JsonToString.
 const N = (path: string) => tasks.DynamoAttributeValue.numberFromString(sfn.JsonPath.jsonToString(sfn.JsonPath.objectAt(path)));
 
-/** Build a Pass state that sets $.story to a Graveyard-ready shape with a fixed reason. */
-function reasonState(scope: Construct, id: string, reason: string, opts: { keepText: boolean; fromExecution?: boolean }) {
+/**
+ * Build a Pass state that sets $.story to a Graveyard-ready shape with a fixed reason. `detail`
+ * says what exactly went wrong (a literal, or a JSONPath into the state) and picks the board quip.
+ */
+function reasonState(
+  scope: Construct,
+  id: string,
+  reason: string,
+  opts: { keepText: boolean; fromExecution?: boolean; detail: string | { path: string } },
+) {
+  const detail = typeof opts.detail === 'string' ? { detail: opts.detail } : { 'detail.$': opts.detail.path };
   return new sfn.Pass(scope, id, {
     parameters: opts.fromExecution
       ? {
@@ -44,12 +53,14 @@ function reasonState(scope: Construct, id: string, reason: string, opts: { keepT
           'createdAt.$': '$$.Execution.StartTime',
           text: '',
           reason,
+          ...detail,
         }
       : {
           'storyId.$': '$.story.storyId',
           'createdAt.$': '$.story.createdAt',
           ...(opts.keepText ? { 'text.$': '$.story.text' } : { text: '' }),
           reason,
+          ...detail,
         },
     resultPath: '$.story',
   });
@@ -70,6 +81,7 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
       messageBody: sfn.TaskInput.fromObject({
         storyId: sfn.JsonPath.stringAt('$.story.storyId'),
         reason: sfn.JsonPath.stringAt('$.story.reason'),
+        detail: sfn.JsonPath.stringAt('$.story.detail'),
         execution: sfn.JsonPath.stringAt('$$.Execution.Id'),
       }),
       resultPath: sfn.JsonPath.DISCARD,
@@ -83,6 +95,7 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
         status: tasks.DynamoAttributeValue.fromString('graveyard'),
         createdAt: S('$.story.createdAt'),
         reason: S('$.story.reason'),
+        detail: S('$.story.detail'),
         text: S('$.story.text'),
       },
       resultPath: sfn.JsonPath.DISCARD,
@@ -90,12 +103,12 @@ export function buildPipelineDefinition(scope: Construct, props: PipelineDefinit
   );
   graveyard.next(new sfn.Succeed(scope, 'Rejected'));
 
-  const unreadable = reasonState(scope, 'Reason: Unreadable Story', 'other', { keepText: false, fromExecution: true }).next(graveyard);
-  const moderationDown = reasonState(scope, 'Reason: Moderation Unavailable', 'other', { keepText: false }).next(graveyard);
-  const redact = reasonState(scope, 'Redact Blocked Story', 'moderation_blocked', { keepText: false }).next(graveyard);
-  const invalidOutput = reasonState(scope, 'Reason: Invalid Model Output', 'invalid_model_output', { keepText: true }).next(graveyard);
-  const pipelineError = reasonState(scope, 'Reason: Pipeline Error', 'other', { keepText: true }).next(graveyard);
-  const outputBlocked = reasonState(scope, 'Reason: Output Blocked', 'invalid_model_output', { keepText: true }).next(graveyard);
+  const unreadable = reasonState(scope, 'Reason: Unreadable Story', 'other', { keepText: false, fromExecution: true, detail: 'unreadable' }).next(graveyard);
+  const moderationDown = reasonState(scope, 'Reason: Moderation Unavailable', 'other', { keepText: false, detail: 'moderation_down' }).next(graveyard);
+  const redact = reasonState(scope, 'Redact Blocked Story', 'moderation_blocked', { keepText: false, detail: { path: '$.moderation.detail' } }).next(graveyard);
+  const invalidOutput = reasonState(scope, 'Reason: Invalid Model Output', 'invalid_model_output', { keepText: true, detail: 'schema' }).next(graveyard);
+  const pipelineError = reasonState(scope, 'Reason: Pipeline Error', 'other', { keepText: true, detail: 'error' }).next(graveyard);
+  const outputBlocked = reasonState(scope, 'Reason: Output Blocked', 'invalid_model_output', { keepText: true, detail: { path: '$.outputCheck.detail' } }).next(graveyard);
 
   const loadStory = new tasks.LambdaInvoke(scope, 'Load Story', {
     lambdaFunction: fns.loadStory,

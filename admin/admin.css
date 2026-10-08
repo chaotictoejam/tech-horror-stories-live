@@ -40,8 +40,10 @@ td.time { color: var(--muted); white-space: nowrap; width: 100px; font-variant-n
 td.act { width: 110px; text-align: right; }
 .headline { font-weight: 700; }
 .story { color: var(--muted); font-size: 14px; margin-top: 2px; }
-.reason { font-weight: 700; color: var(--danger); white-space: nowrap; }
+.reason { font-weight: 700; color: var(--danger); width: 260px; }
 .reason.removed { color: var(--warn); }
+.detail { font-weight: 400; font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; }
+.quip { font-weight: 400; font-size: 13px; color: var(--ink-2); font-style: italic; white-space: normal; }
 .hidden-text { color: var(--muted); font-style: italic; }
 .empty td { color: var(--muted); text-align: center; padding: 20px; }
 @media (max-width: 700px) {

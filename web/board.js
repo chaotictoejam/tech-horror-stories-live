@@ -157,7 +157,10 @@
       const li = el('li', 'grave');
       if (!seenGraves.has(g.id) && !firstRender) li.classList.add('new');
       seenGraves.add(g.id);
-      li.append(el('span', 'reason', REASON_LABELS[g.reason] || 'Pipeline error'));
+      const why = el('div', 'why');
+      why.append(el('span', 'reason', REASON_LABELS[g.reason] || 'Pipeline error'));
+      if (g.quip) why.append(el('span', 'quip', g.quip));
+      li.append(why);
       if (g.reason === 'moderation_blocked' || g.reason === 'removed') {
         li.append(el('span', 'text redacted', 'Story redacted'));
       } else if (g.text) {

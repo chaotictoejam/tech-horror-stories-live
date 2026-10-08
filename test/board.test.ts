@@ -51,7 +51,7 @@ describe('board handler', () => {
       .on(QueryCommand, { ExpressionAttributeValues: { ':s': 'graveyard' } })
       .resolves({
         Items: [
-          { id: 'grave-0001', status: 'graveyard', createdAt: '2026-10-07T12:00:00Z', reason: 'moderation_blocked', text: 'leaked text' },
+          { id: 'grave-0001', status: 'graveyard', createdAt: '2026-10-07T12:00:00Z', reason: 'moderation_blocked', detail: 'profanity', text: 'leaked text' },
           { id: 'grave-0002', status: 'graveyard', createdAt: '2026-10-07T12:00:00Z', reason: 'invalid_model_output', text: 'ok shit text' },
           { id: 'grave-0003', status: 'graveyard', createdAt: '2026-10-07T12:00:00Z', reason: 'removed', text: 'presenter buried this' },
         ],
@@ -72,6 +72,8 @@ describe('board handler', () => {
     expect(res.body).not.toMatch(/fuck|shit/);
     expect(res.body).not.toContain('leaked text');
     expect(res.body).not.toContain('presenter buried this');
+    expect(body.graveyard[0].quip).toMatch(/professionals|vocabulary|HR/);
+    expect(body.graveyard.every((g: any) => typeof g.quip === 'string' && g.quip.length > 0)).toBe(true);
   });
 });
 
