@@ -9,7 +9,7 @@ import { Construct } from 'constructs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const HANDLERS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'handlers');
+const HANDLERS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'src', 'handlers');
 
 export interface MonitoredFunctionProps {
   /** File name in src/handlers, without extension. */

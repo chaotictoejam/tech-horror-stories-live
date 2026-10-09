@@ -12,11 +12,11 @@ import type * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import type { Construct } from 'constructs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PRESENTER_KEY_PARAM, type AppConfig } from '../config/app-config.js';
+import { PRESENTER_KEY_PARAM, type AppConfig } from '../../config/app-config.js';
 import { invokeModelStatement } from './bedrock-iam.js';
 import { MonitoredFunction } from './constructs/monitored-function.js';
 
-const WEB_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'web');
+const WEB_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'web');
 
 export interface BoardStackProps extends StackProps {
   config: AppConfig;

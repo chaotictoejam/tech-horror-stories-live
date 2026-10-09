@@ -10,7 +10,7 @@ How the pieces fit together. For the big picture, start with the [README](../REA
 | `TechHorrorPipeline` | Standard state machine, Load/Moderate/Classify/Validate Lambdas, Bedrock Guardrail, stories table, Graveyard SQS queue, the EventBridge rule | When tuning the AI steps |
 | `TechHorrorBoard` | CloudFront + S3 for both pages, board read API, postmortem API and worker | When polishing the board |
 
-Every Lambda uses one construct, `MonitoredFunction` ([lib/constructs/monitored-function.ts](../lib/constructs/monitored-function.ts)): Node 22 on ARM, esbuild bundling, 1 week log retention, and an error alarm wired to the alert topic.
+Every Lambda uses one construct, `MonitoredFunction` ([lib/constructs/monitored-function.ts](../infra/lib/constructs/monitored-function.ts)): Node 22 on ARM, esbuild bundling, 1 week log retention, and an error alarm wired to the alert topic.
 
 ## The state machine
 

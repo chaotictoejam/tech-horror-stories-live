@@ -4,7 +4,7 @@ How the demo keeps an open, anonymous form on a projector safe.
 
 ## Moderation
 
-Everything the audience writes and everything the model writes goes through a Bedrock Guardrail. Policies live in [lib/pipeline-stack.ts](../lib/pipeline-stack.ts).
+Everything the audience writes and everything the model writes goes through a Bedrock Guardrail. Policies live in [lib/pipeline-stack.ts](../infra/lib/pipeline-stack.ts).
 
 There are two guardrails. The main one makes block decisions and reviews model output. A second, masking-only guardrail replaces names, links, and secrets in audience stories. It exists because **Bedrock Guardrails only anonymize when `source` is `OUTPUT`**; on `INPUT` the mask rules are silently ignored, so the Moderate step runs the story through the masking guardrail as `OUTPUT`.
 

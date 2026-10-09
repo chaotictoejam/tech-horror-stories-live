@@ -7,7 +7,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import { mockClient } from 'aws-sdk-client-mock';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PipelineStack } from '../lib/pipeline-stack.js';
+import { PipelineStack } from '../infra/lib/pipeline-stack.js';
 import { SEED_STORIES } from '../scripts/stories.js';
 import { AslRunner, resolveDefinition } from './support/asl-runner.js';
 

@@ -8,7 +8,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as subs from 'aws-cdk-lib/aws-sns-subscriptions';
 import type { Construct } from 'constructs';
-import type { AppConfig } from '../config/app-config.js';
+import type { AppConfig } from '../../config/app-config.js';
 import { MonitoredFunction } from './constructs/monitored-function.js';
 
 export interface IngestionStackProps extends StackProps {

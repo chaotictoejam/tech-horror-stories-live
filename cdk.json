@@ -1,9 +1,8 @@
 {
-  "app": "npx tsx bin/app.ts",
+  "app": "npx tsx infra/bin/app.ts",
   "watch": {
     "include": [
-      "bin",
-      "lib",
+      "infra",
       "config",
       "src",
       "web"

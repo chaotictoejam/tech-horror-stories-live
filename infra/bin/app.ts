@@ -1,5 +1,5 @@
 import { App, Tags } from 'aws-cdk-lib';
-import { loadConfig, PREFIX } from '../config/app-config.js';
+import { loadConfig, PREFIX } from '../../config/app-config.js';
 import { BoardStack } from '../lib/board-stack.js';
 import { IngestionStack } from '../lib/ingestion-stack.js';
 import { PipelineStack } from '../lib/pipeline-stack.js';

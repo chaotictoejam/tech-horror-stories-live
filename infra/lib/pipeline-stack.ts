@@ -10,7 +10,7 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import { Construct } from 'constructs';
 import { createHash } from 'node:crypto';
-import type { AppConfig } from '../config/app-config.js';
+import type { AppConfig } from '../../config/app-config.js';
 import { invokeModelStatement } from './bedrock-iam.js';
 import { MonitoredFunction } from './constructs/monitored-function.js';
 import { buildPipelineDefinition } from './state-machine.js';

@@ -41,14 +41,14 @@ No AgentCore, no Strands, no agent loop. Every story takes the same known path, 
 
 | If you want to see... | Look at |
 |---|---|
-| The workflow, including retries, catches, and the Graveyard | [lib/state-machine.ts](lib/state-machine.ts) |
+| The workflow, including retries, catches, and the Graveyard | [lib/state-machine.ts](infra/lib/state-machine.ts) |
 | How story text is kept out of the instructions (prompt injection defence) | [src/shared/prompt.ts](src/shared/prompt.ts) |
 | The schema that model output must pass | [src/shared/schema.ts](src/shared/schema.ts) |
 | Calling Bedrock with the Converse API, and tracking token cost | [src/shared/bedrock.ts](src/shared/bedrock.ts), [src/shared/cost.ts](src/shared/cost.ts) |
-| Guardrail policies: blocked topics, masked data, custom regexes | [lib/pipeline-stack.ts](lib/pipeline-stack.ts), [src/shared/guardrail.ts](src/shared/guardrail.ts) |
+| Guardrail policies: blocked topics, masked data, custom regexes | [lib/pipeline-stack.ts](infra/lib/pipeline-stack.ts), [src/shared/guardrail.ts](src/shared/guardrail.ts) |
 | Defeating `ｆ𝐮ｃｋ`-style filter evasion | [src/shared/normalize.ts](src/shared/normalize.ts), [src/shared/censor.ts](src/shared/censor.ts) |
-| Least-privilege IAM for cross-region inference profiles | [lib/bedrock-iam.ts](lib/bedrock-iam.ts) |
-| One Lambda construct with logging, ARM, and an error alarm built in | [lib/constructs/monitored-function.ts](lib/constructs/monitored-function.ts) |
+| Least-privilege IAM for cross-region inference profiles | [lib/bedrock-iam.ts](infra/lib/bedrock-iam.ts) |
+| One Lambda construct with logging, ARM, and an error alarm built in | [lib/constructs/monitored-function.ts](infra/lib/constructs/monitored-function.ts) |
 | Testing the real state machine locally, with Bedrock mocked | [test/state-machine.test.ts](test/state-machine.test.ts), [test/support/asl-runner.ts](test/support/asl-runner.ts) |
 | The board (plain HTML, CSS, and JS; no framework) | [web/](web/) |
 
