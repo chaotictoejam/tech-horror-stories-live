@@ -56,6 +56,10 @@ const graveCard = (r: StoryRow) => ({
   text: HIDDEN_REASONS.has(r.reason ?? '') ? '' : censor(r.text ?? ''),
 });
 
+// Every viewer gets the same response, so CloudFront may share it for a second.
+// s-maxage applies only to shared caches; browsers still refetch every poll.
+export const BOARD_CACHE = { 'cache-control': 'public, max-age=0, s-maxage=1' };
+
 export const handler = async (): Promise<APIGatewayProxyStructuredResultV2> => {
   const table = process.env.TABLE_NAME!;
   const [published, graveyard, totalsRes, running] = await Promise.all([
@@ -86,5 +90,5 @@ export const handler = async (): Promise<APIGatewayProxyStructuredResultV2> => {
     },
     inFlight: running,
     generatedAt: new Date().toISOString(),
-  });
+  }, BOARD_CACHE);
 };

@@ -75,6 +75,14 @@ describe('board handler', () => {
     expect(body.graveyard[0].quip).toMatch(/professionals|vocabulary|HR/);
     expect(body.graveyard.every((g: any) => typeof g.quip === 'string' && g.quip.length > 0)).toBe(true);
   });
+
+  it('lets CloudFront share the response for a second but not browsers', async () => {
+    docMock.on(QueryCommand).resolves({ Items: [] }).on(GetCommand).resolves({});
+    sfnMock.on(ListExecutionsCommand).resolves({ executions: [] });
+    const { handler } = await import('../src/handlers/board.js');
+    const res = await handler();
+    expect(res.headers!['cache-control']).toBe('public, max-age=0, s-maxage=1');
+  });
 });
 
 describe('postmortem api', () => {

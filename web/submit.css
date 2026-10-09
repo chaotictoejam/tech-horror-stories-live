@@ -87,5 +87,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 #status { min-height: 1.5em; margin: 18px 0 0; font: 24px/1.25 var(--f-osd); text-transform: uppercase; letter-spacing: 0.04em; }
 #status.ok { color: var(--ok); }
 #status.err { color: var(--warn); }
+#watch { margin: 10px 0 0; }
+#watch a { color: var(--accent); font: 24px/1.25 var(--f-osd); text-transform: uppercase; letter-spacing: 0.06em; text-underline-offset: 4px; }
+#watch a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .fine { color: var(--muted); font-size: 14px; margin-top: 28px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

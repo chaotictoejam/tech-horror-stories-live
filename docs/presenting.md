@@ -42,8 +42,8 @@ It listens on 127.0.0.1 only, requires the random token from the printed URL, an
 
 1. Step Functions console: state machine `TechHorrorPipeline-story-pipeline`, **Executions** tab. The newest is at the top.
 2. Open it and switch to **Graph view**. Green states ran, grey were skipped.
-3. Click **Load Story**: the input is the S3 key from EventBridge, and the output shows the story id and whether it was usable.
-4. Click **Moderate**: the Guardrail verdict, text units, and cost.
+3. Click **Load Story** and show only its **input**: the S3 key from EventBridge. Do not open its output on the projector. It still holds the original story text, names included, because masking happens in the next step.
+4. Click **Moderate**: the Guardrail verdict, text units, and cost. Every state from here on has the masked text.
 5. Click **Classify and Validate**, then **Classify**: raw model output plus `input_tokens`, `output_tokens`, and `cost_usd`. If the model returned bad JSON, the retry shows in the event list.
 6. Click **Publish to Board**: the exact DynamoDB item. Point at the counter on the board going up.
 7. For a rejection, open an execution that ended in `Rejected` and show the reason state it went through.
@@ -63,7 +63,7 @@ Press `P` (or click **Postmortem**) to write one for the scariest story. To pick
 | Board says "Reconnecting..." | Room Wi-Fi is down. Run `npm run replay` and switch the projector to `http://localhost:8080/board.html#key=replay`. The REPLAY badge stays visible. |
 | Everything lands in the Graveyard as "Pipeline error" | Usually Bedrock access or a wrong model ID. Check the Classify Lambda logs. Redeploy with `-c classifierModelId=...`. |
 | Good stories show "Blocked by moderation" | Guardrail too strict. Lower filter strengths in [lib/pipeline-stack.ts](../infra/lib/pipeline-stack.ts) and redeploy `TechHorrorPipeline` (about 1 minute). |
-| Something offensive is on the board | **Bury** it from the admin page. It disappears on the next 2 second poll. |
+| Something offensive is on the board | **Bury** it from the admin page. It disappears within a few seconds. |
 | Someone is abusing the form | **Close submissions** on the admin page (or `npm run kill`). Phones get "Submissions closed". |
 | Postmortem "failed its own moderation review" | The Guardrail blocked what the model wrote. Shift+click Postmortem to regenerate, or pick another story. |
 | Postmortem button missing | The board was opened without `#key=`. Open the bookmark from `npm run presenter-key`. |

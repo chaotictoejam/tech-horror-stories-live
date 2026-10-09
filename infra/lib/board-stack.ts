@@ -143,6 +143,21 @@ export class BoardStack extends Stack {
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
     });
 
+    // The board is the same for every viewer. A 1 second edge cache (plus CloudFront's request
+    // collapsing) means any number of open boards costs about one Lambda call per second,
+    // so audience phones cannot use up the stage throttle and starve the projector.
+    const boardCache = new cloudfront.CachePolicy(this, 'BoardCache', {
+      comment: 'Share /api/board between viewers for 1 second',
+      minTtl: Duration.seconds(0),
+      defaultTtl: Duration.seconds(1),
+      maxTtl: Duration.seconds(1),
+      headerBehavior: cloudfront.CacheHeaderBehavior.none(),
+      queryStringBehavior: cloudfront.CacheQueryStringBehavior.none(),
+      cookieBehavior: cloudfront.CacheCookieBehavior.none(),
+      enableAcceptEncodingGzip: true,
+      enableAcceptEncodingBrotli: true,
+    });
+
     const distribution = new cloudfront.Distribution(this, 'Cdn', {
       comment: 'Tech Horror Stories',
       defaultRootObject: 'index.html',
@@ -154,8 +169,11 @@ export class BoardStack extends Stack {
       },
       additionalBehaviors: {
         '/api/stories': apiBehavior(submitApi),
+        '/api/board': { ...apiBehavior(api), allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD, cachePolicy: boardCache },
         '/api/*': apiBehavior(api),
       },
+      // CloudFront caches bare 5xx responses for 10 seconds by default. Do not freeze the board on one Lambda error.
+      errorResponses: [500, 502, 503, 504].map((httpStatus) => ({ httpStatus, ttl: Duration.seconds(0) })),
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
     });
 

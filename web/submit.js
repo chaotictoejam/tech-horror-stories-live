@@ -6,6 +6,7 @@
   const count = document.getElementById('count');
   const send = document.getElementById('send');
   const status = document.getElementById('status');
+  const watch = document.getElementById('watch');
   let cooling = 0;
   let busy = false;
 
@@ -79,6 +80,8 @@
       } else if (res.status === 202) {
         story.value = '';
         say('Received. Watch the board.', 'ok');
+        // Only offered after a submit, so the link does not pull people away before they write.
+        watch.hidden = false;
         startCooldown(COOLDOWN);
       } else if (res.status === 429) {
         say(body.message || 'Slow down a little.', 'err');
