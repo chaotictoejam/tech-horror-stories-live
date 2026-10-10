@@ -19,7 +19,7 @@ Everything you need to run your own copy in an AWS account.
    done
    ```
 
-   **Check quotas, not just access.** A model can be listed as ACTIVE and still have a quota of 0. New accounts start with 0 tokens per minute for Claude 5.x models on Bedrock, which is why the postmortem defaults to Sonnet 4.6. New accounts also get only 10 concurrent Lambda executions; request 1,000 in Service Quotas (Lambda, "Concurrent executions") a few days before the talk. Haiku 4.5 allows 50 requests per minute by default; the pipeline retries patiently on throttling, so a burst arrives late rather than in the Graveyard.
+   **Check quotas, not just access.** A model can be listed as ACTIVE and still have a quota of 0. New accounts start with 0 tokens per minute for Claude 5.x models on Bedrock, which is why the postmortem defaults to Sonnet 4.6. New accounts also get only 10 concurrent Lambda executions; request 1,000 in Service Quotas (Lambda, "Concurrent executions") a few days before you run the demo. Haiku 4.5 allows 50 requests per minute by default; the pipeline retries patiently on throttling, so a burst arrives late rather than in the Graveyard.
    ```bash
    aws lambda get-account-settings --query AccountLimit.ConcurrentExecutions
    aws service-quotas list-service-quotas --service-code bedrock --query "Quotas[?contains(QuotaName,'Cross-region model inference')&&contains(QuotaName,'Claude')].[QuotaName,Value]" --output text
@@ -56,7 +56,7 @@ npm run deploy           # cdk deploy --all, writes cdk-outputs.json for the scr
 npm run presenter-key    # creates the key and prints the presenter board URL
 npm run qr               # QR codes in qr/
 npm run seed             # 22 stories through the real API
-npm run teardown         # after the talk
+npm run teardown         # after the demo
 ```
 
 | Script | What it does |
@@ -93,5 +93,5 @@ Rough model cost for 60 people x 3 stories (180 stories):
 | Lambda, API Gateway, DynamoDB, S3, EventBridge, SQS, CloudFront (board polling every 2s for an hour is about 1,800 requests) | under $0.05 combined |
 | CloudWatch alarms (9 alarms at $0.10 per month, prorated) | about $0.03 per day while deployed |
 
-The whole talk should come in well under $1. Tear down afterwards so the alarms stop accruing. The $5 Budget alerts at 80% actual and 100% forecast.
+A full demo session should come in well under $1. Tear down afterwards so the alarms stop accruing. The $5 Budget alerts at 80% actual and 100% forecast.
 

@@ -1,10 +1,10 @@
 # Tech Horror Stories
 
-A live, crowd-sourced AI pipeline built for a conference talk. The audience scanned a QR code, typed their worst production incident into their phone in 280 characters, and watched it move through a serverless AWS pipeline onto a board on the projector: moderated, classified by an LLM, scored for fear, and occasionally buried in the Graveyard with a deadpan quip.
+A live, crowd-sourced AI pipeline demo. People scan a QR code, type their worst production incident into their phone in 280 characters, and watch it move through a serverless AWS pipeline onto a board on the projector: moderated, classified by an LLM, scored for fear, and occasionally buried in the Graveyard with a deadpan quip.
 
 This repo is the whole thing, infrastructure included. You can read it to see how the pieces fit, or deploy your own copy and run the demo yourself.
 
-**The point of the talk:** you don't need a data platform to build an AI-powered pipeline. A few Lambdas, a Step Functions state machine, and Bedrock get you surprisingly far, and everything is pay-per-use, so nothing runs (or costs anything) when nobody is using it.
+**The point of the demo:** you don't need a data platform to build an AI-powered pipeline. A few Lambdas, a Step Functions state machine, and Bedrock get you surprisingly far, and everything is pay-per-use, so nothing runs (or costs anything) when nobody is using it.
 
 ```mermaid
 flowchart LR
@@ -31,11 +31,11 @@ flowchart LR
 7. **Check the output.** The model's own words go back through the same Guardrail before anything reaches the screen.
 8. **Publish or bury.** Good stories land on the board. Everything else lands in the Graveyard with the reason it failed and a fixed, canned quip.
 
-On stage, the presenter can also ask a larger model (Claude Sonnet 4.6) to write a blameless postmortem for the scariest story. That runs asynchronously, because it can take longer than an HTTP API allows.
+During the demo, the presenter can also ask a larger model (Claude Sonnet 4.6) to write a blameless postmortem for the scariest story. That runs asynchronously, because it can take longer than an HTTP API allows.
 
 ## Why not an agent?
 
-No AgentCore, no Strands, no agent loop. Every story takes the same known path, and the model is called once per story with no tools, so a Step Functions workflow fits better than an agent: hostile audience input can't steer it, the moderation steps can't be skipped, every failure has a named path, and the cost per story is predictable. [Architecture](docs/architecture.md#why-not-an-agent-agentcore-strands-bedrock-agents-langgraph) has the full reasoning, and when an agent would be the right call.
+No AgentCore, no Strands, no agent loop. Every story takes the same known path, and the model is called once per story with no tools, so a Step Functions workflow fits better than an agent: hostile input can't steer it, the moderation steps can't be skipped, every failure has a named path, and the cost per story is predictable. [Architecture](docs/architecture.md#why-not-an-agent-agentcore-strands-bedrock-agents-langgraph) has the full reasoning, and when an agent would be the right call.
 
 ## A tour of the code
 
@@ -71,4 +71,4 @@ A session with 60 people submitting three stories each costs well under $1, and 
 - [Architecture](docs/architecture.md): the three stacks, the state machine, and the design decisions behind them.
 - [Moderation and security](docs/moderation-and-security.md): what the Guardrail blocks or masks, profanity handling, prompt injection, rate limits, and privacy.
 - [Deploying](docs/deploying.md): prerequisites, configuration, every npm script, and cost.
-- [Presenting](docs/presenting.md): running this as a live demo. The local admin page, the run sheet, and what to do when something breaks on stage.
+- [Presenting](docs/presenting.md): running this as a live demo. The local admin page, the run sheet, and what to do when something breaks mid-demo.

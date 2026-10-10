@@ -1,6 +1,6 @@
 # Presenting
 
-The presenter's guide: the local admin page, the run sheet, and what to do when something breaks on stage. It assumes you have already deployed (see [Deploying](deploying.md)).
+The presenter's guide: the local admin page, the run sheet, and what to do when something breaks mid-demo. It assumes you have already deployed (see [Deploying](deploying.md)).
 
 ## Presenter admin (local only)
 
@@ -14,7 +14,7 @@ A page that runs on your laptop only, using your own AWS credentials. There is n
 - **Hide text** on a Graveyard entry that shows text.
 - **Close / reopen submissions** (same as `npm run kill` / `npm run reopen`).
 
-It listens on 127.0.0.1 only, requires the random token from the printed URL, and checks the Host header, so neither the conference Wi-Fi nor a web page you visit can drive it. Text is censored the same way as the board in case your screen is mirrored.
+It listens on 127.0.0.1 only, requires the random token from the printed URL, and checks the Host header, so neither the venue Wi-Fi nor a web page you visit can drive it. Text is censored the same way as the board in case your screen is mirrored.
 
 ## Demo run sheet
 
@@ -72,7 +72,7 @@ Press `P` (or click **Postmortem**) to write one for the scariest story. To pick
 | Phones get "One story every 20 seconds" | Working as intended. |
 | Whole room gets errors | Stage throttle (20 rps). Raise it in [lib/ingestion-stack.ts](../infra/lib/ingestion-stack.ts). |
 
-### After the talk
+### After the demo
 
 `npm run teardown`, then check that the CloudFormation console shows no stacks left.
 

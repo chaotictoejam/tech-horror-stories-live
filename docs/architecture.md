@@ -25,7 +25,7 @@ Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Apply Redact
              (Queue for Review + Record in Graveyard) -> Rejected
 ```
 
-- One execution per story (no Map state). Each one can be opened in the console during the talk.
+- One execution per story (no Map state). Each one can be opened in the console while the demo runs.
 - Every failure path ends in `Rejected`, a Succeed state. Bad input never fails an execution. Lambda errors are caught too: `Load Story` goes to `Reason: Unreadable Story`, `Moderate` to `Reason: Moderation Unavailable`.
 - `Classify and Validate` is a Parallel with one branch. That lets a single native Retry re-run both steps when the model returns something that fails the zod schema.
 - `Load Story` normalizes text first (look-alike characters, invisible and direction-flipping characters, spaced-out letters) so filter-evasion tricks stop working.
@@ -36,16 +36,16 @@ Load Story -> Is Story Usable? -> Moderate -> Passed Moderation? -> Apply Redact
 
 ## Why not an agent (AgentCore, Strands, Bedrock Agents, LangGraph)?
 
-The most common question after the talk. The short answer: **this is a workflow, not an agent**, and that distinction is the point of the demo.
+The short answer: **this is a workflow, not an agent**, and that distinction is the point of the demo.
 
 An agent framework is built for work where the model decides what happens next. Strands Agents runs a loop in which the model picks tools, calls them, reads the results, and keeps going until it decides it is done. Amazon Bedrock AgentCore gives that loop somewhere managed to live: a runtime, memory, a gateway to tools, identity, and observability. Bedrock Agents and LangGraph cover similar ground. These are good tools when the path through a task is not known in advance.
 
 Here the path is known in advance. Every story goes through the same steps in the same order: normalize, moderate, classify, validate, check the output, publish or bury. The model is called once per story to do one well-defined thing (turn text into a small JSON object), and it has no tools at all. That is a job for a state machine, and choosing one buys several things that matter for this demo.
 
-- **The input is hostile by design.** Anyone in the room can type anything. With no tools, the worst a successful prompt injection can do is produce bad JSON, which the zod schema rejects and the story lands in the Graveyard. Give the same model tools and a loop, and an injection gets to choose which tool to call next.
+- **The input is hostile by design.** Anyone with the QR code can type anything. With no tools, the worst a successful prompt injection can do is produce bad JSON, which the zod schema rejects and the story lands in the Graveyard. Give the same model tools and a loop, and an injection gets to choose which tool to call next.
 - **The safety steps cannot be skipped.** The Guardrail runs before the model and again on its output because the state machine says so, not because a prompt asked the model to check. No reasoning step can route around moderation.
 - **Every failure has a named path.** Retries, catches, and the Graveyard reasons are explicit states. An agent that gets confused fails in open-ended ways; this one fails into `Reason: Invalid Model Output`.
-- **You can watch it.** Each story is one Step Functions execution with a graph you can click through on stage. Anyone can see exactly what ran, with what input, and what it cost.
+- **You can watch it.** Each story is one Step Functions execution with a graph you can click through live. Anyone can see exactly what ran, with what input, and what it cost.
 - **Cost is predictable.** One small Haiku call per story (plus up to two retries if its JSON fails validation) and a Guardrail check. An agent loop's cost depends on how many turns the model decides to take.
 - **It is testable.** The whole workflow runs locally in the test suite against mocked Bedrock ([test/support/asl-runner.ts](../test/support/asl-runner.ts)). The same input always takes the same path.
 - **Less to run.** No agent runtime, no session memory, no tool gateway. It is Lambda, Step Functions, and two Bedrock APIs (`Converse` and `ApplyGuardrail`).
@@ -54,6 +54,7 @@ Here the path is known in advance. Every story goes through the same steps in th
 
 ## Design decisions and assumptions
 
+- Submit writes to S3 and an S3 `Object Created` event starts the pipeline, instead of the Lambda calling `StartExecution` directly. This demo is data-focused, so the workflow is triggered by data landing in a bucket, not by application code. Anything that can drop a file in the bucket (another system's export, `aws s3 cp`, a different front end) starts the same pipeline, and the submit Lambda doesn't need to know the state machine exists. It also keeps the raw story out of the execution input: the input is just the S3 key, which is safe to show on the projector. The cost is a little extra latency and a bucket that holds raw text for a day.
 - The EventBridge rule lives in `TechHorrorPipeline`, not `TechHorrorIngestion`. The rule targets the state machine and the pipeline reads the bucket, so putting it in ingestion would create a circular cross-stack reference.
 - Moderation uses a Bedrock Guardrail (`ApplyGuardrail`), not a model call. It is cheaper and shows up as its own cost line. Names are masked rather than blocked so a story about "Dave" still makes the board without naming him. Emails, phone numbers, and keys block the whole story.
 - Empty stories are accepted by the submit API on purpose, so the Graveyard has something to show. Stories over 280 characters are rejected with 400 at the API. The pipeline checks length again.
