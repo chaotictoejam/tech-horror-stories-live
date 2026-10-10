@@ -62,7 +62,7 @@ Press `P` (or click **Postmortem**) to write one for the scariest story. To pick
 |---|---|
 | Board says "Reconnecting..." | Room Wi-Fi is down. Run `npm run replay` and switch the projector to `http://localhost:8080/board.html#key=replay`. The REPLAY badge stays visible. |
 | Everything lands in the Graveyard as "Pipeline error" | Usually Bedrock access or a wrong model ID. Check the Classify Lambda logs. Redeploy with `-c classifierModelId=...`. |
-| Good stories show "Blocked by moderation" | Guardrail too strict. Lower filter strengths in [lib/pipeline-stack.ts](../infra/lib/pipeline-stack.ts) and redeploy `TechHorrorPipeline` (about 1 minute). |
+| Good stories show "Blocked by moderation" | Guardrail too strict. Lower filter strengths in [infra/lib/pipeline-stack.ts](../infra/lib/pipeline-stack.ts) and redeploy `TechHorrorPipeline` (about 1 minute). |
 | Something offensive is on the board | **Bury** it from the admin page. It disappears within a few seconds. |
 | Someone is abusing the form | **Close submissions** on the admin page (or `npm run kill`). Phones get "Submissions closed". |
 | Postmortem "failed its own moderation review" | The Guardrail blocked what the model wrote. Shift+click Postmortem to regenerate, or pick another story. |
@@ -70,7 +70,7 @@ Press `P` (or click **Postmortem**) to write one for the scariest story. To pick
 | Postmortem says "Presenter key required" | The key was rotated. Re-run `npm run presenter-key` and use the new URL. Lambdas pick it up within a minute. |
 | Postmortem "had its own incident" | Postmortem model access or ID. Check the PostmortemWorker logs. An `AccessDeniedException` about AWS Marketplace means the model was never invoked by an admin (see [Prerequisites](deploying.md#prerequisites)); invoke it once, wait 5 minutes, then Shift+P. The rest of the demo is unaffected. |
 | Phones get "One story every 20 seconds" | Working as intended. |
-| Whole room gets errors | Stage throttle (20 rps). Raise it in [lib/ingestion-stack.ts](../infra/lib/ingestion-stack.ts). |
+| Whole room gets errors | Stage throttle (20 rps). Raise it in [infra/lib/ingestion-stack.ts](../infra/lib/ingestion-stack.ts). |
 
 ### After the demo
 
