@@ -1,4 +1,4 @@
-// Submits the 20 seed stories through the real public API so every one gets its own execution.
+// Submits the 22 seed stories through the real public API so every one gets its own execution.
 // Usage: npm run seed [-- --fast] [-- --url https://xxxx.cloudfront.net/]
 //        npm run seed -- --burst 60   load test: 60 good stories at the same moment, like a room scanning the QR code
 import { randomBytes } from 'node:crypto';
