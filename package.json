@@ -14,7 +14,8 @@
     "deploy": "cdk deploy --all --outputs-file cdk-outputs.json",
     "teardown": "bash scripts/teardown.sh",
     "admin": "tsx scripts/admin.ts",
-    "reset": "tsx scripts/reset.ts"
+    "reset": "tsx scripts/reset.ts",
+    "screenshots": "tsx scripts/screenshots.ts"
   },
   "repository": {
     "type": "git",

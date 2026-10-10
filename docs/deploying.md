@@ -51,6 +51,7 @@ Model prices live in [config/prices.ts](../config/prices.ts). Update them if Bed
 ```bash
 npm install
 npm test                 # unit tests + the state machine run locally against mocked Bedrock
+npm run typecheck        # tsc, no emit
 npm run synth            # cdk synth, all three stacks
 npm run deploy           # cdk deploy --all, writes cdk-outputs.json for the scripts
 npm run presenter-key    # creates the key and prints the presenter board URL
@@ -70,6 +71,7 @@ npm run teardown         # after the demo
 | `npm run presenter-key` | Rotates the presenter key in SSM and prints `board.html#key=...` |
 | `npm run replay -- --record` | Saves the live board and cached postmortems to `replay/recording.json` |
 | `npm run replay` | Offline board at `http://localhost:8080/board.html#key=replay` |
+| `npm run screenshots [-- --out dir]` | Regenerates the README images in `docs/images/` from the offline replay board. Needs Chrome (set `CHROME=` if it is not found). No deployment needed |
 | `npm run teardown` | `cdk destroy --all`, deletes the presenter key and local outputs |
 
 ## Cost
@@ -89,7 +91,7 @@ Rough model cost for 60 people x 3 stories (180 stories):
 
 | Service | Estimate |
 |---|---|
-| Step Functions Standard (about 10 transitions per story, 1,800 total; 4,000 per month are free) | $0 to $0.05 |
+| Step Functions Standard (about 14 transitions per published story, about 2,500 total; 4,000 per month are free) | $0 to $0.05 |
 | Lambda, API Gateway, DynamoDB, S3, EventBridge, SQS, CloudFront (board polling every 2s for an hour is about 1,800 requests) | under $0.05 combined |
 | CloudWatch alarms (9 alarms at $0.10 per month, prorated) | about $0.03 per day while deployed |
 
