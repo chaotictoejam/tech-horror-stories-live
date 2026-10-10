@@ -6,18 +6,26 @@ This repo is the whole thing, infrastructure included. You can read it to see ho
 
 **The point of the demo:** you don't need a data platform to build an AI-powered pipeline. A few Lambdas, a Step Functions state machine, and Bedrock get you surprisingly far, and everything is pay-per-use, so nothing runs (or costs anything) when nobody is using it.
 
+![The board on the projector: published stories with headline, category, fear level, and root cause, and the live model cost along the bottom](docs/images/board-feed.webp)
+
+| The phone | The Graveyard | A postmortem |
+|---|---|---|
+| ![Submit page on a phone](docs/images/submit-phone.webp) | ![Graveyard with rejection reasons and canned quips](docs/images/board-graveyard.webp) | ![Blameless postmortem written by the larger model](docs/images/board-postmortem.webp) |
+
+<sub>Screenshots are from the offline replay board (`npm run replay`) using a recorded run of the seed stories. Regenerate them with `npm run screenshots`.</sub>
+
 ```mermaid
 flowchart LR
   phone[Phone] -->|POST /api/stories| cf[CloudFront]
-  cf --> api[HTTP API] --> submit[Submit Lambda]
+  cf --> api[Submit API] --> submit[Submit Lambda]
   submit -->|kill switch + cooldown| cfg[(Config table)]
   submit --> s3[(S3 raw stories)]
   s3 -->|Object Created| eb[EventBridge] --> sfn[Step Functions Standard]
-  sfn --> load[Load Story] --> mod[Moderate: Bedrock Guardrail] --> cls[Classify: Bedrock Converse] --> val[Validate: zod]
-  val --> pub[(DynamoDB stories)]
+  sfn --> load[Load Story] --> mod[Moderate: Bedrock Guardrail] --> cls[Classify: Bedrock Converse] --> val[Validate: zod] --> modout[Moderate Output: Guardrail]
+  modout --> pub[(DynamoDB stories)]
   sfn -.rejected.-> grave[Graveyard: SQS + DynamoDB]
-  board[Board page] -->|poll every 2s| cf --> bapi[Board API] --> pub
-  board -->|presenter only| pm[Postmortem: larger model]
+  board[Board page] -->|poll every 2s, 1s edge cache| cf --> bapi[Board API] --> pub
+  board -->|presenter only| pm[Postmortem API] -->|async| worker[Postmortem worker: larger model]
 ```
 
 ## What happens to a story
@@ -26,7 +34,7 @@ flowchart LR
 2. **Start a workflow.** The S3 upload fires an EventBridge event, which starts one Step Functions execution per story. Each one is a visual trace you can open in the console.
 3. **Clean up.** `Load Story` normalizes the text (look-alike characters, invisible characters, s p a c e d - o u t letters) so filter-evasion tricks stop working, and catches empty stories, gibberish, short heckles, and heavy swearing.
 4. **Moderate.** A Bedrock Guardrail blocks hate, threats, prompt attacks, and personal data, and masks names, links, and secrets (`[name]`, `[link]`, `[token]`) before the model ever sees them.
-5. **Classify.** Claude Haiku 4.5 reads the story and returns JSON: a headline, a category, a fear level, a root cause, and whether it is a story at all.
+5. **Classify.** Claude Haiku 4.5 reads the story and returns JSON: a headline, a category, a fear level, a root cause, whether the company survived, and whether it is a story at all.
 6. **Validate.** A strict zod schema checks the model's output. If it fails, Step Functions retries the model call natively.
 7. **Check the output.** The model's own words go back through the same Guardrail before anything reaches the screen.
 8. **Publish or bury.** Good stories land on the board. Everything else lands in the Graveyard with the reason it failed and a fixed, canned quip.
@@ -41,14 +49,14 @@ No AgentCore, no Strands, no agent loop. Every story takes the same known path, 
 
 | If you want to see... | Look at |
 |---|---|
-| The workflow, including retries, catches, and the Graveyard | [lib/state-machine.ts](infra/lib/state-machine.ts) |
+| The workflow, including retries, catches, and the Graveyard | [infra/lib/state-machine.ts](infra/lib/state-machine.ts) |
 | How story text is kept out of the instructions (prompt injection defence) | [src/shared/prompt.ts](src/shared/prompt.ts) |
 | The schema that model output must pass | [src/shared/schema.ts](src/shared/schema.ts) |
 | Calling Bedrock with the Converse API, and tracking token cost | [src/shared/bedrock.ts](src/shared/bedrock.ts), [src/shared/cost.ts](src/shared/cost.ts) |
-| Guardrail policies: blocked topics, masked data, custom regexes | [lib/pipeline-stack.ts](infra/lib/pipeline-stack.ts), [src/shared/guardrail.ts](src/shared/guardrail.ts) |
+| Guardrail policies: blocked topics, masked data, custom regexes | [infra/lib/pipeline-stack.ts](infra/lib/pipeline-stack.ts), [src/shared/guardrail.ts](src/shared/guardrail.ts) |
 | Defeating `ｆ𝐮ｃｋ`-style filter evasion | [src/shared/normalize.ts](src/shared/normalize.ts), [src/shared/censor.ts](src/shared/censor.ts) |
-| Least-privilege IAM for cross-region inference profiles | [lib/bedrock-iam.ts](infra/lib/bedrock-iam.ts) |
-| One Lambda construct with logging, ARM, and an error alarm built in | [lib/constructs/monitored-function.ts](infra/lib/constructs/monitored-function.ts) |
+| Least-privilege IAM for cross-region inference profiles | [infra/lib/bedrock-iam.ts](infra/lib/bedrock-iam.ts) |
+| One Lambda construct with logging, ARM, and an error alarm built in | [infra/lib/constructs/monitored-function.ts](infra/lib/constructs/monitored-function.ts) |
 | Testing the real state machine locally, with Bedrock mocked | [test/state-machine.test.ts](test/state-machine.test.ts), [test/support/asl-runner.ts](test/support/asl-runner.ts) |
 | The board (plain HTML, CSS, and JS; no framework) | [web/](web/) |
 
